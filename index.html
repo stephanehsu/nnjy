@@ -1116,7 +1116,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.6</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.7</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -3475,16 +3475,16 @@ function importSutra(encodedTitle,encodedFolder,encodedCat){
   if(btn)btn.textContent='載入中…';
   const path=folder?folder+'/'+title+'.txt':title+'.txt';
   fetch(GITHUB_RAW+path.split('/').map(encodeURIComponent).join('/'))
-    .then(r=>{if(!r.ok)throw new Error();return r.text();})
+    .then(r=>{if(!r.ok)throw new Error('fetch_fail');return r.text();})
     .then(text=>{
       const clean=cleanText(text);
-      addToLib(title,clean,category);
+      try{ addToLib(title,clean,category); }catch(e){ console.warn('addToLib error',e); }
       if(btn){
         btn.textContent='已匯入';
         btn.style.borderColor='var(--text3)';
         btn.style.color='var(--text3)';
       }
-      renderLib(); // 即時更新書庫
+      renderLib();
       const flash=document.createElement('div');
       flash.textContent='「'+title+'」已加入書庫';
       flash.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);'+
