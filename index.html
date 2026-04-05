@@ -155,14 +155,14 @@ html,body{
   flex:1;min-height:0;
   display:flex;flex-direction:row;
   background:#f0e8d0;
-  padding:12px 12px 12px 0;
+  padding:12px 12px 12px 12px;
   gap:0;
   overflow:hidden;
 }
 
 /* 左側：書名＋頁碼 */
 #book-left{
-  width:18px;flex-shrink:0;
+  width:14px;flex-shrink:0;
   display:flex;flex-direction:column;
   align-items:center;
   justify-content:space-between;
@@ -235,15 +235,26 @@ html,body{
   text-orientation:mixed;
   width:100%;height:100%;
   font-family:var(--font-main);
-  font-size:20px;line-height:2.2;
+  font-size:25px;line-height:2.2;
   color:#2a1a0a;
   white-space:pre-wrap;word-break:break-all;
+  text-align:justify;
 }
 
 /* 書卷風格主題（覆蓋 theme 變數） */
 #reader .sentence{color:#2a1a0a}
 #reader .sentence.active{color:#8b1a1a;background:transparent}
 #reader .sentence.passed{color:#9a8060}
+#reader .sentence strong{
+  font-weight:700;
+  color:#8b1a1a;
+}
+#reader .sentence.passed strong{
+  color:#9a8060;
+}
+#reader .sentence.active strong{
+  color:#8b1a1a;
+}
 
 /* 句子高亮 — inline 讓整句連續，高亮包覆整句 */
 .sentence{
@@ -821,6 +832,7 @@ html,body{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.1.3</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -972,6 +984,37 @@ html,body{
 <!-- 遍數浮現動畫 -->
 <div id="lap-flash"></div>
 
+<!-- 手動安裝說明 overlay -->
+<div id="install-guide-overlay" style="display:none;position:fixed;inset:0;z-index:600;
+  background:rgba(0,0,0,.65);align-items:center;justify-content:center;
+  padding:1.5rem;writing-mode:horizontal-tb">
+  <div style="background:#2a1a08;border:1px solid #c8952a;border-radius:10px;
+    width:100%;max-width:320px;padding:1.5rem;font-family:var(--font-main)">
+    <div style="font-size:16px;color:#e8c87a;letter-spacing:.15em;margin-bottom:1rem;
+      display:flex;justify-content:space-between;align-items:center">
+      <span>安裝至主畫面</span>
+      <button onclick="closeInstallGuide()" style="background:none;border:none;
+        color:#a08858;font-size:18px;cursor:pointer;padding:0 4px">✕</button>
+    </div>
+    <div style="font-size:13px;color:#c8a870;line-height:2;letter-spacing:.05em">
+      <div style="margin-bottom:.75rem">
+        <span style="color:#e8c87a">iOS Safari：</span><br>
+        點下方 <span style="color:#e8c87a">分享按鈕（⬆）</span>，選「加入主畫面」
+      </div>
+      <div>
+        <span style="color:#e8c87a">Android Chrome：</span><br>
+        點右上角 <span style="color:#e8c87a">⋮ 選單</span>，選「安裝應用程式」或「加入主畫面」
+      </div>
+    </div>
+    <button onclick="closeInstallGuide()" style="margin-top:1.25rem;width:100%;
+      padding:10px;border-radius:4px;background:#c8780a;border:none;
+      color:#f5edd8;font-family:var(--font-main);font-size:14px;
+      letter-spacing:.1em;cursor:pointer">
+      知道了
+    </button>
+  </div>
+</div>
+
 <!-- 設定覆蓋層 -->
 <div class="settings-overlay" id="settings-overlay" onclick="closeSettings()"></div>
 
@@ -1019,7 +1062,7 @@ html,body{
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--border);color:var(--text2);
                font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">－</button>
-      <span id="fs-val" style="font-family:var(--font-main);font-size:16px;color:var(--text);min-width:48px;text-align:center;letter-spacing:.05em">20px</span>
+      <span id="fs-val" style="font-family:var(--font-main);font-size:16px;color:var(--text);min-width:48px;text-align:center;letter-spacing:.05em">25px</span>
       <button onclick="adjustFontSize(1)"
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--accent);color:var(--accent);
@@ -1471,25 +1514,28 @@ function openFromLib(encodedTitle){
   const lib=loadLib();
   const item=lib.find(i=>i.title===title);
   if(!item)return;
+  // 切換前先儲存當前進度
+  if(currentTitle&&currentTitle!==title){
+    saveReadPos(currentTitle,currentPage,currentIdx);
+  }
   currentTitle=title;
   currentCategory=item.category||'其他';
-  // 切換經典時先隱藏加1按鈕
   const lapBtn=document.getElementById('lap-btn');
   if(lapBtn)lapBtn.style.display='none';
-  processText(item.text);
-  showPage('reader');
-  closeLib();
-  updateLapDisplay(title);
-  // 念珠：只有佛號短咒才顯示，且需設定開啟
-  const rosaryMode=localStorage.getItem('nnjy_rosary')||'off';
-  showRosary(currentCategory==='佛號短咒'&&rosaryMode!=='off');
-  rosaryPos=0;
+  // 先設定恢復位置，renderPage 才能讀到
   const pos=loadReadPos(title);
   if(pos&&pos.sent>0){
     pendingRestorePos={sent:pos.sent,page:pos.page||0};
   }else{
     pendingRestorePos=null;
   }
+  processText(item.text);
+  showPage('reader');
+  closeLib();
+  updateLapDisplay(title);
+  const rosaryMode=localStorage.getItem('nnjy_rosary')||'off';
+  showRosary(currentCategory==='佛號短咒'&&rosaryMode!=='off');
+  rosaryPos=0;
 }
 function setFont(el){
   document.querySelectorAll('.font-item').forEach(f=>f.classList.remove('active'));
@@ -1627,18 +1673,24 @@ function processText(text){
   const rawLines=raw.split('\n');
   const parts=[];
   lineBreaks={};
-  let pendingDouble=false; // 前一行是空行，下一個有內容的句子的前一句要標記雙換行
+  let pendingDouble=false;
   rawLines.forEach(line=>{
     const l=line.trim();
     if(!l.length){
-      // 空行：標記待補雙換行
       pendingDouble=true;
       return;
     }
-    const marked=l.replace(punctReg,'$1\u0000');
-    const segs=marked.split('\u0000').map(s=>s.trim()).filter(s=>s.length>0);
+    // 先把 **...** 替換成佔位符，防止 * 被當成斷句符號切斷
+    const boldPlaceholders=[];
+    const protected_=l.replace(/\*\*(.*?)\*\*/g,(match,inner)=>{
+      boldPlaceholders.push(inner);
+      return `\u0001${boldPlaceholders.length-1}\u0001`;
+    });
+    const marked=protected_.replace(punctReg,'$1\u0000');
+    const segs=marked.split('\u0000').map(s=>s.trim()).filter(s=>s.length>0)
+      // 還原佔位符為 **...**
+      .map(s=>s.replace(/\u0001(\d+)\u0001/g,(_,i)=>`**${boldPlaceholders[parseInt(i)]}**`));
     if(!segs.length)return;
-    // 若前面有空行，把雙換行標記加到上一句
     if(pendingDouble && parts.length>0){
       lineBreaks[parts.length-1]=2;
       pendingDouble=false;
@@ -1716,10 +1768,6 @@ function offsetToSentIdx(offset){
 function createProbe(isVert, areaW, areaH){
   const tc=document.getElementById('text-container');
   const tcStyle=getComputedStyle(tc);
-  const area=document.getElementById('reading-area');
-  const areaStyle=getComputedStyle(area);
-  const padH=parseFloat(areaStyle.paddingLeft)+parseFloat(areaStyle.paddingRight);
-  const padV=parseFloat(areaStyle.paddingTop)+parseFloat(areaStyle.paddingBottom);
 
   const probe=document.createElement('div');
   probe.style.cssText=[
@@ -1736,7 +1784,7 @@ function createProbe(isVert, areaW, areaH){
     `text-orientation:${tcStyle.textOrientation}`,
     'white-space:pre-wrap',
     'word-break:break-all',
-    `padding:${areaStyle.paddingTop} ${areaStyle.paddingRight} ${areaStyle.paddingBottom} ${areaStyle.paddingLeft}`,
+    'padding:0',
   ].join(';');
   document.body.appendChild(probe);
   return probe;
@@ -1750,14 +1798,23 @@ function calculatePageEnd(startOffset, isVert, areaW, areaH){
   const probe=createProbe(isVert, areaW, areaH);
 
   // 二分搜尋：找最大的 L 使得 flatText[startOffset..startOffset+L] 不溢出
+  // 直排 vertical-rl：文字由上往下排列，列由右往左增加
+  //   → 列數增加時 scrollWidth 會超過容器 width（往左溢出）
+  //   → 但實測 scrollHeight 更穩定：每列字數固定，scrollHeight = 最長列的高度
+  //   → 改用 scrollWidth > areaW 偵測列數溢出
+  // 橫排：行數增加時 scrollHeight > areaH
   let lo=1, hi=totalLen-startOffset, result=1;
   while(lo<=hi){
     const mid=(lo+hi)>>1;
     probe.textContent=_flatText.slice(startOffset, startOffset+mid);
-    // 直排：溢出方向為 width（向左擴展）；橫排：溢出方向為 height
-    const overflows=isVert
-      ? probe.scrollWidth > areaW
-      : probe.scrollHeight > areaH;
+    let overflows;
+    if(isVert){
+      // 直排：固定高度容器，列從右往左疊，用 scrollWidth 偵測水平溢出
+      // 同時用 scrollHeight 偵測單列字數溢出（某列太長超過容器高）
+      overflows = probe.scrollWidth > areaW || probe.scrollHeight > areaH;
+    }else{
+      overflows = probe.scrollHeight > areaH;
+    }
     if(overflows){
       hi=mid-1;
     }else{
@@ -1766,33 +1823,21 @@ function calculatePageEnd(startOffset, isVert, areaW, areaH){
     }
   }
   document.body.removeChild(probe);
-
-  // ── 語義斷句回溯 ──
-  // 找到 L_max 後，若結束點不在語義邊界，往回找最近的斷句符號
-  const rawEnd=startOffset+result;
-  if(rawEnd>=totalLen) return totalLen;
-
-  // 從 rawEnd 往回找最近的語義結束符
-  let scanEnd=rawEnd;
-  // 最多回溯 60 字，避免過度回溯
-  const maxBacktrack=Math.min(60, result-1);
-  let found=false;
-  for(let k=0;k<=maxBacktrack;k++){
-    const ch=_flatText[rawEnd-1-k];
-    if(ch===undefined) break;
-    if(SEMANTIC_END.test(ch)){
-      scanEnd=rawEnd-k; // 包含該標點
-      found=true;
-      break;
-    }
-  }
-  // 若整段都找不到語義邊界（如超長無標點句），直接用 rawEnd
-  return found ? scanEnd : rawEnd;
+  // 直接回傳 Binary Search 找到的最大字元位置，不做語義回溯
+  return Math.min(startOffset+result, totalLen);
 }
 
-function buildPages(){
+// ── 分頁快取 ──
+const _pageCache=new Map(); // key -> {pages, sentencePageMap}
+let _buildingKey=null; // 目前正在計算的 key，避免重複觸發
+
+function getCacheKey(isVert, areaW, areaH, fs, lh, flatLen){
+  return `${isVert?'v':'h'}_${Math.round(areaW)}_${Math.round(areaH)}_${fs}_${lh}_${flatLen}`;
+}
+
+function buildPages(onDone){
   pages=[];sentencePageMap={};
-  if(!sentences.length)return;
+  if(!sentences.length){ if(onDone)onDone(); return; }
 
   const area=document.getElementById('reading-area');
   const tc=document.getElementById('text-container');
@@ -1805,63 +1850,92 @@ function buildPages(){
   const areaH=Math.max(1,area.clientHeight-padV);
 
   if(areaW<=1||areaH<=1){
-    setTimeout(()=>{buildPages();showPage_num(0,true);updateLapBtn();},120);
-    return;
+    // 延遲重試時不清除 pendingRestorePos
+    setTimeout(()=>{buildPages(onDone);},120); return;
   }
   if(areaH<200){
-    setTimeout(()=>{buildPages();showPage_num(0,true);updateLapBtn();},200);
-    return;
+    setTimeout(()=>{buildPages(onDone);},200); return;
   }
 
   buildFlatText();
 
-  // 逐頁切分：嚴格以句子邊界為單位，確保每句只屬於一頁
-  let sentStart=0; // 本頁從第幾句開始（句子索引）
-  const totalSent=sentences.length;
-  let pageIdx=0;
+  const tcStyle=getComputedStyle(tc);
+  const cacheKey=getCacheKey(isVert,areaW,areaH,tcStyle.fontSize,tcStyle.lineHeight,_flatText.length);
 
-  while(sentStart<totalSent){
-    // 本頁起始字元偏移 = 第 sentStart 句的 start
-    const startOffset=_sentBoundaries[sentStart].start;
-
-    // 用 Binary Search 找出一頁能放幾個字元
-    const rawEndOffset=calculatePageEnd(startOffset, isVert, areaW, areaH);
-
-    // 將 rawEndOffset 轉換為對應的句子索引
-    // 找出最後一句「完整包含在 rawEndOffset 之內」的句子
-    // 即 b.end <= rawEndOffset 的最大 i
-    let lastSentInPage=sentStart; // 至少放一句
-    for(let i=sentStart;i<totalSent;i++){
-      const b=_sentBoundaries[i];
-      if(b.end<=rawEndOffset){
-        lastSentInPage=i;
-      }else{
-        break;
-      }
-    }
-
-    // 組成本頁句子列表（sentStart ~ lastSentInPage，嚴格不重疊）
-    const sentIdxList=[];
-    for(let i=sentStart;i<=lastSentInPage;i++) sentIdxList.push(i);
-
-    const pageStartOffset=_sentBoundaries[sentStart].start;
-    const pageEndOffset=_sentBoundaries[lastSentInPage].end;
-
-    pages.push({startOffset:pageStartOffset, endOffset:pageEndOffset, sentIdxList});
-    sentIdxList.forEach(si=>{ sentencePageMap[si]=pageIdx; });
-    pageIdx++;
-
-    // 下一頁從 lastSentInPage+1 句開始，嚴格不重疊
-    sentStart=lastSentInPage+1;
+  // ── 快取命中：直接套用 ──
+  if(_pageCache.has(cacheKey)){
+    const cached=_pageCache.get(cacheKey);
+    pages=cached.pages;
+    sentencePageMap=cached.sentencePageMap;
+    console.log(`分頁快取命中：${pages.length}頁`);
+    if(onDone)onDone();
+    return;
   }
 
-  console.log(`分頁完成：${pages.length}頁，共${sentences.length}句，區域:${Math.round(areaW)}×${Math.round(areaH)}`);
+  // ── 快取未命中：分批非同步計算 ──
+  if(_buildingKey===cacheKey) return; // 已在計算中，忽略重複觸發
+  _buildingKey=cacheKey;
+
+  const totalSent=sentences.length;
+  const newPages=[];
+  const newSentencePageMap={};
+  let charOffset=0;
+  let pageIdx=0;
+  const totalLen=_flatText.length;
+
+  showToast('計算分頁中…',99999);
+
+  function processChunk(){
+    const CHUNK=5;
+    let count=0;
+    while(charOffset<totalLen && count<CHUNK){
+      const endOffset=calculatePageEnd(charOffset, isVert, areaW, areaH);
+      if(endOffset<=charOffset){
+        // 防止死循環：至少前進1字
+        charOffset++;
+        continue;
+      }
+      // 找出此頁包含哪些句子（用於念誦 sentencePageMap）
+      for(let i=0;i<_sentBoundaries.length;i++){
+        const b=_sentBoundaries[i];
+        if(b.start>=endOffset) break;
+        if(b.end>charOffset && !(i in newSentencePageMap)){
+          newSentencePageMap[i]=pageIdx;
+        }
+      }
+      newPages.push({startOffset:charOffset, endOffset});
+      pageIdx++;
+      charOffset=endOffset;
+      count++;
+    }
+
+    if(charOffset<totalLen){
+      // 還有剩，讓出主執行緒後繼續
+      setTimeout(processChunk, 0);
+    }else{
+      // 全部完成
+      _buildingKey=null;
+      _pageCache.set(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
+      if(_pageCache.size>8){
+        _pageCache.delete(_pageCache.keys().next().value);
+      }
+      pages=newPages;
+      sentencePageMap=newSentencePageMap;
+      const t=document.getElementById('_toast');
+      if(t) t.style.opacity='0';
+      console.log(`分頁完成：${pages.length}頁，共${sentences.length}句`);
+      if(onDone)onDone();
+    }
+  }
+
+  setTimeout(processChunk, 0);
 }
 
 function showPage_num(p,noAnim){
   if(!pages.length)return;
   p=Math.max(0,Math.min(p,pages.length-1));
   currentPage=p;
+  if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
   const pg=document.getElementById('book-page-num');
   if(pg)pg.textContent=p+1;
   const c=document.getElementById('text-container');
@@ -1869,32 +1943,62 @@ function showPage_num(p,noAnim){
   const isVert=c.style.writingMode!=='horizontal-tb';
   const doRender=()=>{
     c.innerHTML='';
-    const sentList=(pages[p]?.sentIdxList||pages[p]||[]);
-    sentList.forEach(i=>{
+    const pg=pages[p];
+    if(!pg)return;
+    const {startOffset,endOffset}=pg;
+
+    // 用字元偏移量渲染：找出此頁範圍內的句子，逐句建立 span
+    // 若句子跨頁，只顯示此頁範圍內的部分
+    let pos=startOffset;
+    // 找第一個與此頁有交集的句子
+    let si=0;
+    for(let i=0;i<_sentBoundaries.length;i++){
+      if(_sentBoundaries[i].end>startOffset){ si=i; break; }
+    }
+
+    while(pos<endOffset && si<_sentBoundaries.length){
+      const b=_sentBoundaries[si];
+      if(b.start>=endOffset) break;
+
+      // 此句在本頁的範圍
+      const segStart=Math.max(pos,b.start);
+      const segEnd=Math.min(endOffset,b.end);
+      if(segStart>=segEnd){ si++; continue; }
+
+      // 取得此段文字（從 _flatText 對應句子位置反推回 sentences[si]）
+      // 計算在句子內的起止位置
+      const inSentStart=segStart-b.start;
+      const inSentEnd=segEnd-b.start;
+      const sentText=sentences[si];
+      const segText=sentText.slice(inSentStart,inSentEnd);
+
       const sp=document.createElement('span');
       sp.className='sentence';
-      sp.innerHTML=sentences[i].replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-      sp.dataset.idx=i;
-      sp.addEventListener('click',()=>onSentenceClick(i));
-      if(i===currentIdx)sp.classList.add('active');
-      else if(i<currentIdx)sp.classList.add('passed');
+      sp.innerHTML=segText.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+      sp.dataset.idx=si;
+      sp.addEventListener('click',()=>onSentenceClick(si));
+      if(si===currentIdx) sp.classList.add('active');
+      else if(si<currentIdx) sp.classList.add('passed');
       c.appendChild(sp);
-      if(lineBreaks[i]>=1) c.appendChild(document.createElement('br'));
-      if(lineBreaks[i]>=2) c.appendChild(document.createElement('br'));
-    });
-    // 排版置中：佛號短咒直排時置中，佛教經典維持靠右
+
+      // 換行：只在句子完整結束時插入
+      if(segEnd>=b.end && lineBreaks[si]>=1) c.appendChild(document.createElement('br'));
+      if(segEnd>=b.end && lineBreaks[si]>=2) c.appendChild(document.createElement('br'));
+
+      pos=segEnd;
+      if(segEnd>=b.end) si++;
+    }
+
     requestAnimationFrame(()=>{
       if(isVert){
         const isChant=currentCategory==='佛號短咒';
         if(isChant){
-          // 縮小容器寬度為內容實際寬，再用 flex 置中
           c.style.width='fit-content';
           c.style.minWidth='';
           area.style.display='flex';
           area.style.alignItems='flex-start';
           area.style.justifyContent='center';
         }else{
-          // 佛教經典：撐滿寬度，靠右排
           c.style.width='100%';
           area.style.display='';
           area.style.alignItems='';
@@ -1923,19 +2027,20 @@ function showPage_num(p,noAnim){
 function renderPage(){
   requestAnimationFrame(()=>{
     requestAnimationFrame(()=>{
-      buildPages();
-      if(pendingRestorePos){
-        const sent=Math.min(pendingRestorePos.sent,sentences.length-1);
-        currentIdx=sent;
-        const p=sentencePageMap[sent]??0;
-        currentPage=-1;
-        showPage_num(p,true);
-        updateProgress();
-        pendingRestorePos=null;
-      }else{
-        showPage_num(0,true);
-      }
-      updateLapBtn();
+      buildPages(()=>{
+        if(pendingRestorePos){
+          const sent=Math.min(pendingRestorePos.sent,sentences.length-1);
+          currentIdx=sent;
+          const p=sentencePageMap[sent]??0;
+          currentPage=-1;
+          showPage_num(p,true);
+          updateProgress();
+          pendingRestorePos=null;
+        }else{
+          showPage_num(0,true);
+        }
+        updateLapBtn();
+      });
     });
   });
 }
@@ -1945,20 +2050,19 @@ let rebuildTimer=null;
 function rebuildPages(){
   if(!sentences.length)return;
   clearTimeout(rebuildTimer);
-  // 保存當前頁頂端的字元偏移量
   const savedOffset=pages[currentPage]?.startOffset??0;
   rebuildTimer=setTimeout(()=>{
-    buildPages();
-    // 用 savedOffset 找最接近的新頁碼
-    let targetPage=0;
-    if(savedOffset>0){
-      for(let i=0;i<pages.length;i++){
-        if(pages[i].startOffset<=savedOffset) targetPage=i;
-        else break;
+    buildPages(()=>{
+      let targetPage=0;
+      if(savedOffset>0){
+        for(let i=0;i<pages.length;i++){
+          if(pages[i].startOffset<=savedOffset) targetPage=i;
+          else break;
+        }
       }
-    }
-    currentPage=-1;
-    showPage_num(targetPage,true);
+      currentPage=-1;
+      showPage_num(targetPage,true);
+    });
   },150);
 }
 
@@ -2156,7 +2260,7 @@ function setDirection(dir){
 }
 // 字體大小範圍
 const FS_MIN=14,FS_MAX=40;
-let _fontSize=20;
+let _fontSize=25;
 let _lineHeight=2.2;
 let _rebuildTimer=null;
 
@@ -2206,6 +2310,8 @@ function showToast(msg,duration=1800){
 }
 
 function scheduleRebuild(){
+  _pageCache.clear(); // 設定改變，清除所有快取
+  _buildingKey=null;
   if(_rebuildTimer) clearTimeout(_rebuildTimer);
   // 若超過 500ms 還沒完成，顯示提示
   const toastTimer=setTimeout(()=>{
@@ -3036,11 +3142,13 @@ function updateLapBtn(){
 function goNextPage(){
   if(currentPage<pages.length-1){
     showPage_num(currentPage+1);
-    currentIdx=pages[currentPage]?.sentIdxList?.[0]??currentIdx;
+    // 跳到下一頁第一個句子
+    const pg=pages[currentPage];
+    if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
     updateProgress();
   }else{
     showPage_num(0);
-    currentIdx=pages[0]?.sentIdxList?.[0]??0;
+    currentIdx=0;
     updateProgress();
   }
   updateLapBtn();
@@ -3048,10 +3156,19 @@ function goNextPage(){
 function goPrevPage(){
   if(currentPage>0){
     showPage_num(currentPage-1);
-    currentIdx=pages[currentPage]?.sentIdxList?.[0]??currentIdx;
+    const pg=pages[currentPage];
+    if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
     updateProgress();
   }
   updateLapBtn();
+}
+// 根據字元偏移量找對應的句子索引
+function sentencePageMap2sentIdx(offset){
+  for(let i=0;i<_sentBoundaries.length;i++){
+    const b=_sentBoundaries[i];
+    if(b.end>offset) return i;
+  }
+  return 0;
 }
 
 // ── 手動記數按鈕 ──
