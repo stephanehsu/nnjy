@@ -66,14 +66,45 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
+// ── Heartbeat Sync（心跳同步）──
+let _autoSyncTimer = null;
+let _isDirty = false; // 有資料變動才推送
+
+function markDirty() { _isDirty = true; }
+
+function startAutoSync() {
+  if(_autoSyncTimer) clearInterval(_autoSyncTimer);
+  _autoSyncTimer = setInterval(() => {
+    if(window._fbUser && _isDirty) {
+      window._fbPushCloud(window._fbUser.uid, true).then(() => {
+        _isDirty = false;
+      });
+    }
+  }, 10 * 60 * 1000);
+}
+function stopAutoSync() {
+  if(_autoSyncTimer) { clearInterval(_autoSyncTimer); _autoSyncTimer = null; }
+}
+
 // ── 監聽登入狀態 ──
+let _isFirstAuth = true; // 區分「頁面開啟時已登入」vs「使用者剛登入」
 onAuthStateChanged(auth, user => {
+  const wasNull = !window._fbUser;
   window._fbUser = user || null;
   updateSyncUI(user);
   if(user) {
-    // 登入後自動從雲端拉取資料
-    window._fbPullCloud(user.uid);
+    if(_isFirstAuth) {
+      // 頁面開啟時已登入 → 從雲端拉取資料合併
+      window._fbPullCloud(user.uid);
+    } else if(wasNull) {
+      // 使用者剛完成登入 → 從雲端拉取資料合併
+      window._fbPullCloud(user.uid);
+    }
+    startAutoSync();
+  } else {
+    stopAutoSync();
   }
+  _isFirstAuth = false;
 });
 
 // ── 收集所有本機資料 ──
@@ -104,7 +135,7 @@ function collectLocalData() {
 }
 
 // ── 推送到雲端 ──
-window._fbPushCloud = async (uid) => {
+window._fbPushCloud = async (uid, silent=false) => {
   if(!uid) return;
   const data = collectLocalData();
   try {
@@ -112,9 +143,11 @@ window._fbPushCloud = async (uid) => {
       ...data,
       _updatedAt: serverTimestamp(),
     });
-    showToast('✦ 已同步到雲端');
+    if(!silent) showToast('✦ 已同步到雲端');
+    localStorage.setItem('nnjy_syncTs', Date.now());
+    if(typeof updateSyncLastTime === 'function') updateSyncLastTime();
   } catch(e) {
-    showToast('同步失敗：' + e.message);
+    if(!silent) showToast('同步失敗：' + e.message);
   }
 };
 
@@ -1067,7 +1100,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.2</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.4</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1701,10 +1734,14 @@ function addToLib(title,text,category='其他'){
   const item={title,text,date:new Date().toLocaleDateString('zh-TW'),category};
   if(idx>=0)lib[idx]=item;else lib.unshift(item);
   saveLib(lib);
+  markDirty();
+  if(window._fbUser) window._fbPushCloud(window._fbUser.uid, true);
 }
 function deleteFromLib(title){
   const lib=loadLib().filter(i=>i.title!==title);
   saveLib(lib);renderLib();
+  markDirty();
+  if(window._fbUser) window._fbPushCloud(window._fbUser.uid, true);
 }
 function renderLib(){
   const lib=loadLib();
@@ -2943,6 +2980,7 @@ function playGoalSound(){
 }
 
 // 記錄完成一遍
+let _lapSyncTimer = null;
 function recordLap(title){
   const stats=loadStats();
   const t=today();
@@ -2978,6 +3016,14 @@ function recordLap(title){
         updateProgress();
       },200);
     }
+  }
+  // 停手 10 秒後靜默推送（debounce，避免高頻念佛連續寫入）
+  markDirty();
+  if(window._fbUser){
+    clearTimeout(_lapSyncTimer);
+    _lapSyncTimer=setTimeout(()=>{
+      window._fbPushCloud(window._fbUser.uid, true).then(()=>{ _isDirty=false; });
+    }, 10000);
   }
 }
 
@@ -3624,10 +3670,8 @@ async function doSync(){
   const btn = document.getElementById('sync-btn');
   if(btn){ btn.textContent='同步中…'; btn.disabled=true; }
   try {
-    // 先推本機，再拉雲端合併
     await window._fbPushCloud(user.uid);
-    localStorage.setItem('nnjy_syncTs', Date.now());
-    updateSyncLastTime();
+    _isDirty = false;
   } finally {
     if(btn){ btn.textContent='✦ 立即同步'; btn.disabled=false; }
   }
