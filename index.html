@@ -16,7 +16,7 @@
 <!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged }
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -38,26 +38,31 @@ const db = getFirestore(app);
 window._fbAuth = auth;
 window._fbDb = db;
 window._fbGoogleProvider = new GoogleAuthProvider();
-window._fbSignIn = async () => {
-  try {
-    await signInWithRedirect(auth, window._fbGoogleProvider);
-  } catch(e) {
-    showToast('登入失敗：' + e.message);
-  }
+
+// 直接掛 signInWithPopup，由按鈕 onclick 同步觸發
+window._fbSignIn = () => {
+  signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
+    if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request'){
+      showToast('登入失敗：' + (e.code || e.message));
+    }
+  });
 };
 window._fbSignOut = async () => {
   await signOut(auth);
   showToast('已登出');
 };
 
-// ── 處理 redirect 登入回調 ──
-getRedirectResult(auth).then(result => {
-  if(result && result.user) {
-    // redirect 登入成功，onAuthStateChanged 會接手
-  }
-}).catch(e => {
-  if(e.code !== 'auth/no-current-user') {
-    showToast('登入失敗：' + (e.message || e.code));
+// ── 綁定登入按鈕（module 載入完才綁，確保 signInWithPopup 在 user gesture 內） ──
+document.addEventListener('DOMContentLoaded', () => {
+  const loginBtn = document.getElementById('btn-google-login');
+  if(loginBtn) {
+    loginBtn.addEventListener('click', () => {
+      signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
+        if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request'){
+          showToast('登入失敗：' + (e.code || e.message));
+        }
+      });
+    });
   }
 });
 
@@ -1062,7 +1067,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.1</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.2</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1390,7 +1395,7 @@ body.reader-fullscreen #book-left{
       <div style="font-size:12px;color:var(--text3);line-height:1.8;margin-bottom:12px">
         以 Google 帳號登入，書庫、統計、設定可跨裝置同步。
       </div>
-      <button onclick="window._fbSignIn&&window._fbSignIn()"
+      <button id="btn-google-login"
         style="width:100%;min-height:48px;border-radius:4px;
                background:transparent;border:1px solid var(--accent);
                color:var(--accent);font-family:var(--font-main);
