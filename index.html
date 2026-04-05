@@ -68,23 +68,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Heartbeat Sync（心跳同步）──
 let _autoSyncTimer = null;
-let _isDirty = false; // 有資料變動才推送
+// _isDirty 持久化到 localStorage，app 關掉重開仍能補推
+let _isDirty = localStorage.getItem('nnjy_isDirty') === '1';
 
-function markDirty() { _isDirty = true; }
+function markDirty() {
+  _isDirty = true;
+  localStorage.setItem('nnjy_isDirty', '1');
+}
+function clearDirty() {
+  _isDirty = false;
+  localStorage.removeItem('nnjy_isDirty');
+}
 
 function startAutoSync() {
   if(_autoSyncTimer) clearInterval(_autoSyncTimer);
   _autoSyncTimer = setInterval(() => {
     if(window._fbUser && _isDirty) {
-      window._fbPushCloud(window._fbUser.uid, true).then(() => {
-        _isDirty = false;
-      });
+      window._fbPushCloud(window._fbUser.uid, true).then(() => clearDirty());
     }
   }, 10 * 60 * 1000);
 }
 function stopAutoSync() {
   if(_autoSyncTimer) { clearInterval(_autoSyncTimer); _autoSyncTimer = null; }
 }
+
+// ── 斷網補推：網路恢復時若有未推資料，立即補送 ──
+window.addEventListener('online', () => {
+  if(window._fbUser && _isDirty) {
+    window._fbPushCloud(window._fbUser.uid, true).then(() => {
+      clearDirty();
+      showToast('✦ 網路已恢復，資料已同步');
+    });
+  }
+});
 
 // ── 監聽登入狀態 ──
 let _isFirstAuth = true; // 區分「頁面開啟時已登入」vs「使用者剛登入」
@@ -1100,7 +1116,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.5</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.6</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -3089,7 +3105,7 @@ function recordLap(title){
   if(window._fbUser){
     clearTimeout(_lapSyncTimer);
     _lapSyncTimer=setTimeout(()=>{
-      window._fbPushCloud(window._fbUser.uid, true).then(()=>{ _isDirty=false; });
+      window._fbPushCloud(window._fbUser.uid, true).then(()=>{ clearDirty(); });
     }, 10000);
   }
 }
@@ -3738,7 +3754,7 @@ async function doSync(){
   if(btn){ btn.textContent='同步中…'; btn.disabled=true; }
   try {
     await window._fbPushCloud(user.uid);
-    _isDirty = false;
+    clearDirty();
   } finally {
     if(btn){ btn.textContent='✦ 立即同步'; btn.disabled=false; }
   }
