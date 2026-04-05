@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nnjy-v1.0.3.6';
+const CACHE_NAME = 'nnjy-v1.0.3.6b';
 
 // 本地靜態資源
 const STATIC_ASSETS = [
@@ -46,7 +46,9 @@ self.addEventListener('fetch', e => {
     url.hostname.includes('firebase') ||
     url.hostname.includes('firestore') ||
     url.hostname.includes('googleapis.com') && !FONT_HOSTS.includes(url.hostname) ||
-    url.hostname.includes('gstatic.com') && !FONT_HOSTS.includes(url.hostname)
+    url.hostname.includes('gstatic.com') && !FONT_HOSTS.includes(url.hostname) ||
+    url.hostname === 'raw.githubusercontent.com' ||
+    url.hostname === 'api.github.com'
   ) {
     e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
     return;
