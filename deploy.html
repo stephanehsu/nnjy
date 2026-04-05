@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>念念真言 · 部署工具</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;500&display=swap');
+
+:root{
+  --bg:#1a1208;
+  --bg2:#241a0a;
+  --bg3:#2e2010;
+  --border:rgba(200,152,40,0.25);
+  --border2:rgba(200,152,40,0.12);
+  --accent:#c89828;
+  --accent2:#e8b830;
+  --text:#e8dcc8;
+  --text2:#c8a870;
+  --text3:#7a6040;
+  --success:#4a9a60;
+  --error:#c04040;
+  --font:'Noto Serif TC',serif;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  padding:2rem 1rem;
+  position:relative;
+  overflow-x:hidden;
+}
+
+/* 背景紋理 */
+body::before{
+  content:'';
+  position:fixed;inset:0;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(200,152,40,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 20% 80%, rgba(200,120,20,0.04) 0%, transparent 60%);
+  pointer-events:none;
+}
+
+.container{
+  width:100%;max-width:480px;
+  position:relative;z-index:1;
+}
+
+/* 標題 */
+.header{
+  text-align:center;
+  margin-bottom:2.5rem;
+}
+.header-ornament{
+  font-size:28px;color:var(--accent);
+  letter-spacing:.5em;
+  margin-bottom:.75rem;
+  opacity:.7;
+}
+.header h1{
+  font-size:20px;font-weight:400;
+  letter-spacing:.4em;color:var(--accent2);
+  margin-bottom:.4rem;
+}
+.header-sub{
+  font-size:12px;color:var(--text3);
+  letter-spacing:.2em;
+}
+
+/* 卡片 */
+.card{
+  background:var(--bg2);
+  border:1px solid var(--border);
+  border-radius:4px;
+  padding:1.5rem;
+  margin-bottom:1rem;
+}
+.card-title{
+  font-size:12px;color:var(--text3);
+  letter-spacing:.2em;
+  margin-bottom:1rem;
+  padding-bottom:.5rem;
+  border-bottom:1px solid var(--border2);
+}
+
+/* 輸入框 */
+.field{
+  margin-bottom:.75rem;
+}
+.field label{
+  display:block;
+  font-size:12px;color:var(--text3);
+  letter-spacing:.1em;margin-bottom:.4rem;
+}
+.field input{
+  width:100%;
+  background:var(--bg3);
+  border:1px solid var(--border2);
+  border-radius:3px;
+  color:var(--text);
+  font-family:var(--font);
+  font-size:13px;
+  padding:10px 12px;
+  outline:none;
+  transition:border-color .2s;
+  letter-spacing:.05em;
+}
+.field input:focus{border-color:var(--accent);}
+.field input::placeholder{color:var(--text3);}
+
+/* 拖放區域 */
+#drop-zone{
+  border:1.5px dashed var(--border);
+  border-radius:4px;
+  padding:2rem;
+  text-align:center;
+  cursor:pointer;
+  transition:all .2s;
+  position:relative;
+  background:var(--bg3);
+}
+#drop-zone.drag-over{
+  border-color:var(--accent);
+  background:rgba(200,152,40,0.06);
+}
+#drop-zone.has-file{
+  border-color:var(--accent);
+  border-style:solid;
+}
+.drop-icon{
+  font-size:32px;margin-bottom:.75rem;opacity:.5;
+}
+.drop-text{
+  font-size:13px;color:var(--text2);
+  letter-spacing:.1em;line-height:2;
+}
+.drop-hint{
+  font-size:11px;color:var(--text3);
+  letter-spacing:.08em;margin-top:.5rem;
+}
+#file-name{
+  margin-top:.75rem;
+  font-size:13px;color:var(--accent);
+  letter-spacing:.05em;
+  display:none;
+}
+#file-input{
+  position:absolute;inset:0;opacity:0;cursor:pointer;
+}
+
+/* 上傳按鈕 */
+#upload-btn{
+  width:100%;
+  padding:14px;
+  background:transparent;
+  border:1.5px solid var(--accent);
+  border-radius:3px;
+  color:var(--accent);
+  font-family:var(--font);
+  font-size:14px;
+  letter-spacing:.25em;
+  cursor:pointer;
+  transition:all .22s;
+  margin-top:.5rem;
+}
+#upload-btn:hover:not(:disabled){
+  background:var(--accent);
+  color:var(--bg);
+}
+#upload-btn:disabled{
+  opacity:.35;cursor:not-allowed;
+  border-color:var(--text3);color:var(--text3);
+}
+#upload-btn.loading{
+  opacity:.7;cursor:wait;
+}
+
+/* 進度與狀態 */
+#status{
+  margin-top:1rem;
+  font-size:13px;
+  letter-spacing:.08em;
+  line-height:2;
+  min-height:2.5rem;
+  text-align:center;
+}
+#status.success{color:var(--success);}
+#status.error{color:var(--error);}
+#status.info{color:var(--text2);}
+
+#progress-wrap{
+  display:none;
+  margin-top:.75rem;
+  background:var(--bg3);
+  border-radius:2px;
+  height:3px;
+  overflow:hidden;
+}
+#progress-bar{
+  height:100%;
+  background:var(--accent);
+  width:0%;
+  transition:width .3s;
+  border-radius:2px;
+}
+
+/* token說明 */
+.token-hint{
+  font-size:11px;color:var(--text3);
+  letter-spacing:.05em;line-height:1.8;
+  margin-top:.5rem;
+}
+.token-hint a{color:var(--accent);text-decoration:none;}
+.token-hint a:hover{text-decoration:underline;}
+
+/* 分隔線 */
+.divider{
+  font-size:11px;color:var(--text3);
+  letter-spacing:.3em;text-align:center;
+  margin:.5rem 0;opacity:.5;
+}
+
+/* 儲存提示 */
+.save-row{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:.5rem;
+}
+.save-label{font-size:11px;color:var(--text3);letter-spacing:.08em;}
+#save-toggle{
+  width:40px;height:22px;border-radius:11px;
+  background:var(--bg3);border:1px solid var(--border);
+  cursor:pointer;position:relative;transition:all .25s;flex-shrink:0;
+}
+#save-toggle.on{background:var(--accent);border-color:var(--accent);}
+#save-toggle::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--text3);transition:all .25s;
+}
+#save-toggle.on::after{left:20px;background:var(--bg);}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="header-ornament">卍</div>
+    <h1>念念真言</h1>
+    <div class="header-sub">GitHub Pages 部署工具</div>
+  </div>
+
+  <!-- GitHub 設定 -->
+  <div class="card">
+    <div class="card-title">▪ 倉庫設定</div>
+    <div class="field">
+      <label>GitHub Token</label>
+      <input type="password" id="token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+      <div class="token-hint">
+        需要 <strong>repo</strong> 權限的 Personal Access Token。
+        <a href="https://github.com/settings/tokens/new" target="_blank">點此建立 →</a>
+      </div>
+    </div>
+    <div class="field">
+      <label>擁有者 / 倉庫名稱</label>
+      <input type="text" id="repo" placeholder="stephanehsu/nnjy" value="stephanehsu/nnjy">
+    </div>
+    <div class="field">
+      <label>分支</label>
+      <input type="text" id="branch" placeholder="main" value="main">
+    </div>
+    <div class="save-row">
+      <span class="save-label">記住 Token 和設定（存於本機）</span>
+      <div id="save-toggle" onclick="toggleSave()"></div>
+    </div>
+  </div>
+
+  <!-- 檔案選擇 -->
+  <div class="card">
+    <div class="card-title">▪ 選擇要上傳的檔案</div>
+    <div id="drop-zone">
+      <input type="file" id="file-input" accept=".html,.js,.json,.png,.ico,.txt" multiple>
+      <div class="drop-icon">☁</div>
+      <div class="drop-text">拖曳檔案到這裡<br>或點擊選擇</div>
+      <div class="drop-hint">支援 .html .js .json .png 等格式</div>
+      <div id="file-name"></div>
+    </div>
+  </div>
+
+  <!-- 上傳 -->
+  <button id="upload-btn" onclick="upload()" disabled>上 傳 部 署</button>
+
+  <div id="progress-wrap"><div id="progress-bar"></div></div>
+  <div id="status"></div>
+
+</div>
+
+<script>
+// ── 儲存設定 ──
+let saveEnabled=false;
+
+function toggleSave(){
+  saveEnabled=!saveEnabled;
+  document.getElementById('save-toggle').classList.toggle('on',saveEnabled);
+  if(saveEnabled) saveSettings();
+  else localStorage.removeItem('nnjy_deploy');
+}
+
+function saveSettings(){
+  if(!saveEnabled)return;
+  localStorage.setItem('nnjy_deploy',JSON.stringify({
+    token:document.getElementById('token').value,
+    repo:document.getElementById('repo').value,
+    branch:document.getElementById('branch').value,
+  }));
+}
+
+function loadSettings(){
+  const s=localStorage.getItem('nnjy_deploy');
+  if(!s)return;
+  try{
+    const d=JSON.parse(s);
+    if(d.token)document.getElementById('token').value=d.token;
+    if(d.repo)document.getElementById('repo').value=d.repo;
+    if(d.branch)document.getElementById('branch').value=d.branch;
+    saveEnabled=true;
+    document.getElementById('save-toggle').classList.add('on');
+  }catch(e){}
+}
+loadSettings();
+
+// ── 拖放 ──
+let selectedFiles=[];
+
+const dropZone=document.getElementById('drop-zone');
+const fileInput=document.getElementById('file-input');
+
+dropZone.addEventListener('dragover',e=>{
+  e.preventDefault();
+  dropZone.classList.add('drag-over');
+});
+dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop',e=>{
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles(Array.from(e.dataTransfer.files));
+});
+fileInput.addEventListener('change',e=>{
+  handleFiles(Array.from(e.target.files));
+});
+
+function handleFiles(files){
+  if(!files.length)return;
+  selectedFiles=files;
+  dropZone.classList.add('has-file');
+  const names=files.map(f=>f.name).join('、');
+  const el=document.getElementById('file-name');
+  el.textContent='已選擇：'+names;
+  el.style.display='block';
+  document.getElementById('upload-btn').disabled=false;
+  setStatus('');
+}
+
+// ── 上傳 ──
+async function upload(){
+  const token=document.getElementById('token').value.trim();
+  const repo=document.getElementById('repo').value.trim();
+  const branch=document.getElementById('branch').value.trim()||'main';
+
+  if(!token){setStatus('請填入 GitHub Token','error');return;}
+  if(!repo){setStatus('請填入倉庫名稱','error');return;}
+  if(!selectedFiles.length){setStatus('請選擇要上傳的檔案','error');return;}
+
+  if(saveEnabled) saveSettings();
+
+  const btn=document.getElementById('upload-btn');
+  btn.disabled=true;btn.classList.add('loading');
+  btn.textContent='上傳中…';
+
+  const progressWrap=document.getElementById('progress-wrap');
+  const progressBar=document.getElementById('progress-bar');
+  progressWrap.style.display='block';
+  progressBar.style.width='0%';
+
+  let success=0,fail=0;
+  for(let i=0;i<selectedFiles.length;i++){
+    const file=selectedFiles[i];
+    setStatus(`上傳中 ${i+1}/${selectedFiles.length}：${file.name}`,'info');
+    progressBar.style.width=Math.round((i/selectedFiles.length)*100)+'%';
+    try{
+      await uploadFile(token,repo,branch,file);
+      success++;
+    }catch(e){
+      fail++;
+      setStatus(`❌ ${file.name} 上傳失敗：${e.message}`,'error');
+      await sleep(800);
+    }
+  }
+
+  progressBar.style.width='100%';
+  setTimeout(()=>{progressWrap.style.display='none';},1000);
+
+  if(fail===0){
+    setStatus(`✓ 全部上傳完成（${success} 個檔案）\n等待 GitHub Pages 部署約 1～2 分鐘…`,'success');
+  }else{
+    setStatus(`上傳完成：${success} 成功，${fail} 失敗`,'error');
+  }
+
+  btn.disabled=false;btn.classList.remove('loading');
+  btn.textContent='上 傳 部 署';
+}
+
+async function uploadFile(token,repo,branch,file){
+  const path=file.name; // 直接放根目錄
+  const base64=await toBase64(file);
+  const content=base64.split(',')[1];
+
+  // 先取得舊檔的 SHA（更新時需要）
+  const api=`https://api.github.com/repos/${repo}/contents/${path}`;
+  const headers={
+    'Authorization':'token '+token,
+    'Content-Type':'application/json',
+    'Accept':'application/vnd.github.v3+json',
+  };
+
+  let sha=null;
+  const getRes=await fetch(`${api}?ref=${branch}`,{headers});
+  if(getRes.ok){
+    const data=await getRes.json();
+    sha=data.sha;
+  }else if(getRes.status!==404){
+    throw new Error('HTTP '+getRes.status);
+  }
+
+  const body={
+    message:`deploy: update ${path}`,
+    content,
+    branch,
+  };
+  if(sha) body.sha=sha;
+
+  const putRes=await fetch(api,{
+    method:'PUT',headers,
+    body:JSON.stringify(body),
+  });
+  if(!putRes.ok){
+    const err=await putRes.json().catch(()=>({}));
+    throw new Error(err.message||'HTTP '+putRes.status);
+  }
+}
+
+function toBase64(file){
+  return new Promise((res,rej)=>{
+    const r=new FileReader();
+    r.onload=()=>res(r.result);
+    r.onerror=rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function setStatus(msg,type=''){
+  const el=document.getElementById('status');
+  el.textContent=msg;
+  el.className=type;
+  el.style.whiteSpace='pre-line';
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>
