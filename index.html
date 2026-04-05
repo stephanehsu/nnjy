@@ -44,7 +44,33 @@ html,body{
   -webkit-text-size-adjust:100%;
 }
 
-/* ══ 頂部工具列 ══ */
+/* ══ 念誦全螢幕模式 ══ */
+body.reader-fullscreen #topbar{
+  transform:translateY(-100%);
+  transition:transform .35s cubic-bezier(0.4,0,0.2,1);
+  pointer-events:none;
+}
+body.reader-fullscreen #progress-bar{
+  top:0;
+}
+body.reader-fullscreen #main{
+  top:0;
+  transition:top .35s cubic-bezier(0.4,0,0.2,1);
+}
+body.reader-fullscreen #book-left{
+  opacity:0;
+  width:0;overflow:hidden;
+  transition:opacity .25s,width .25s;
+}
+#topbar{
+  transition:transform .35s cubic-bezier(0.4,0,0.2,1);
+}
+#main{
+  transition:top .35s cubic-bezier(0.4,0,0.2,1);
+}
+#book-left{
+  transition:opacity .25s,width .25s;
+}
 #topbar{
   position:fixed;top:0;left:0;right:0;z-index:500;
   height:52px;background:var(--bg2);
@@ -273,7 +299,7 @@ html,body{
 /* ══ 念誦控制 ══ */
 /* 整體容器：右下角，面板往左展開 */
 #chant-float{
-  position:fixed;bottom:24px;right:16px;z-index:160;
+  position:fixed;bottom:180px;right:16px;z-index:160;
   display:none;flex-direction:column;align-items:flex-end;gap:8px;
   writing-mode:horizontal-tb;
 }
@@ -832,7 +858,7 @@ html,body{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.1.3</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.1.9</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -904,17 +930,17 @@ html,body{
     <div id="rosary-v-track" style="display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;z-index:1"></div>
   </div>
   <!-- 記數按鈕（最後一頁才顯示）-->
-  <div id="lap-btn" style="display:none;align-self:flex-end">
+  <div id="lap-btn" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:159;">
     <button id="btn-manual-lap"
-      style="width:44px;height:44px;border-radius:50%;
-             background:var(--bg2);border:2px solid var(--accent);
-             color:var(--accent);font-size:11px;font-family:var(--font-main);
+      style="width:132px;height:132px;border-radius:50%;
+             background:var(--bg2);border:3px solid var(--accent);
+             color:var(--accent);font-size:33px;font-family:var(--font-main);
              cursor:pointer;display:flex;flex-direction:column;
-             align-items:center;justify-content:center;gap:1px;
-             box-shadow:0 2px 8px rgba(0,0,0,.25);
+             align-items:center;justify-content:center;gap:3px;
+             box-shadow:0 4px 20px rgba(0,0,0,.4);
              -webkit-user-select:none;user-select:none;">
-      <span style="font-size:16px;line-height:1">+1</span>
-      <span style="font-size:9px;color:var(--text3)">遍</span>
+      <span style="font-size:48px;line-height:1">+1</span>
+      <span style="font-size:20px;color:var(--text3)">遍</span>
     </button>
   </div>
   <!-- 面板＋球同行 -->
@@ -1567,7 +1593,6 @@ let currentCategory='其他';
 let pendingRestorePos=null;
 
 function showPage(p){
-  // 離開閱讀頁時儲存位置
   if(document.getElementById('reader').classList.contains('show')&&p!=='reader'&&currentTitle){
     saveReadPos(currentTitle,currentPage,currentIdx);
   }
@@ -1576,14 +1601,21 @@ function showPage(p){
   document.getElementById('chant-float').classList.remove('show');
   document.getElementById('stats-page').style.display='none';
   document.getElementById('calendar-page').style.display='none';
-  if(p==='welcome') document.getElementById('welcome').style.display='flex';
-  else if(p==='reader'){
+  if(p==='welcome'){
+    document.getElementById('welcome').style.display='flex';
+    document.body.classList.remove('reader-fullscreen');
+  }else if(p==='reader'){
     document.getElementById('reader').classList.add('show');
     document.getElementById('chant-float').classList.add('show');
+    document.body.classList.add('reader-fullscreen');
+    // 全螢幕後清快取重算分頁（尺寸改變）
+    if(sentences.length) setTimeout(()=>{_pageCache.clear();_buildingKey=null;rebuildPages();},350);
+  }else{
+    document.body.classList.remove('reader-fullscreen');
+    _pageCache.clear();_buildingKey=null;
+    if(p==='stats') document.getElementById('stats-page').style.display='flex';
+    else if(p==='calendar') document.getElementById('calendar-page').style.display='flex';
   }
-  else if(p==='stats') document.getElementById('stats-page').style.display='flex';
-  else if(p==='calendar') document.getElementById('calendar-page').style.display='flex';
-
 }
 function cancelPaste(){closeImportModal()}
 function confirmPaste(){
@@ -1873,7 +1905,7 @@ function buildPages(onDone){
   }
 
   // ── 快取未命中：分批非同步計算 ──
-  if(_buildingKey===cacheKey) return; // 已在計算中，忽略重複觸發
+  // 若有舊的計算在跑（不同 key），讓它繼續但忽略結果，重新開始
   _buildingKey=cacheKey;
 
   const totalSent=sentences.length;
@@ -1886,16 +1918,14 @@ function buildPages(onDone){
   showToast('計算分頁中…',99999);
 
   function processChunk(){
+    // 若 key 已被新的計算取代，放棄此次結果
+    if(_buildingKey!==cacheKey) return;
+
     const CHUNK=5;
     let count=0;
     while(charOffset<totalLen && count<CHUNK){
       const endOffset=calculatePageEnd(charOffset, isVert, areaW, areaH);
-      if(endOffset<=charOffset){
-        // 防止死循環：至少前進1字
-        charOffset++;
-        continue;
-      }
-      // 找出此頁包含哪些句子（用於念誦 sentencePageMap）
+      if(endOffset<=charOffset){ charOffset++; continue; }
       for(let i=0;i<_sentBoundaries.length;i++){
         const b=_sentBoundaries[i];
         if(b.start>=endOffset) break;
@@ -1910,10 +1940,8 @@ function buildPages(onDone){
     }
 
     if(charOffset<totalLen){
-      // 還有剩，讓出主執行緒後繼續
       setTimeout(processChunk, 0);
     }else{
-      // 全部完成
       _buildingKey=null;
       _pageCache.set(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
       if(_pageCache.size>8){
@@ -2050,6 +2078,8 @@ let rebuildTimer=null;
 function rebuildPages(){
   if(!sentences.length)return;
   clearTimeout(rebuildTimer);
+  _pageCache.clear();
+  _buildingKey=null;
   const savedOffset=pages[currentPage]?.startOffset??0;
   rebuildTimer=setTimeout(()=>{
     buildPages(()=>{
@@ -3235,21 +3265,6 @@ track.addEventListener('mousedown',function(e){
 });
 track.addEventListener('touchstart',function(e){e.stopPropagation();handleSpeedDrag(e.touches[0].clientX)},{passive:true});
 track.addEventListener('touchmove',function(e){e.stopPropagation();handleSpeedDrag(e.touches[0].clientX);e.preventDefault();},{passive:false});
-
-// ── 面板拖移 ──
-let panelDragStartY=0,panelStartBottom=24;
-const floatEl=document.getElementById('chant-float');
-floatEl.addEventListener('touchstart',function(e){
-  if(e.target===track||track.contains(e.target))return;
-  panelDragStartY=e.touches[0].clientY;
-  panelStartBottom=parseInt(floatEl.style.bottom)||24;
-},{passive:true});
-floatEl.addEventListener('touchmove',function(e){
-  if(e.target===track||track.contains(e.target))return;
-  const dy=panelDragStartY-e.touches[0].clientY;
-  const nb=Math.max(10,Math.min(window.innerHeight-60,panelStartBottom+dy));
-  floatEl.style.bottom=nb+'px';
-},{passive:true});
 
 // ── 書庫滑出感應 ──
 document.getElementById('lib-swipe-zone').addEventListener('touchstart',e=>{
