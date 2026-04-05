@@ -44,7 +44,22 @@ html,body{
   -webkit-text-size-adjust:100%;
 }
 
-/* ══ 念誦全螢幕模式 ══ */
+/* 全螢幕返回鈕 */
+#reader-back-btn{
+  display:none;
+  position:fixed;top:8px;left:8px;z-index:520;
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(58,37,16,0.6);
+  border:1px solid rgba(200,152,40,0.3);
+  color:#e8c87a;font-size:16px;
+  align-items:center;justify-content:center;
+  cursor:pointer;backdrop-filter:blur(4px);
+  -webkit-user-select:none;user-select:none;
+  transition:opacity .2s;
+  writing-mode:horizontal-tb;
+}
+#reader-back-btn:active{opacity:.6;}
+body.reader-fullscreen #reader-back-btn{display:flex;}
 body.reader-fullscreen #topbar{
   transform:translateY(-100%);
   transition:transform .35s cubic-bezier(0.4,0,0.2,1);
@@ -858,7 +873,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.1.9</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.2.0</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -894,6 +909,8 @@ body.reader-fullscreen #book-left{
 
   <!-- 閱讀頁 -->
   <div id="reader">
+    <!-- 全螢幕返回鈕 -->
+    <button id="reader-back-btn" onclick="stopChant();showPage('welcome')">‹</button>
     <div id="book-wrap">
       <div id="book-left">
         <div id="book-title" class="book-title-text"></div>
