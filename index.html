@@ -1100,7 +1100,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.4</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.5</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1907,10 +1907,10 @@ function showPage(p){
     document.getElementById('chant-float').classList.add('show');
     document.body.classList.add('reader-fullscreen');
     // 全螢幕後清快取重算分頁（尺寸改變）
-    if(sentences.length) setTimeout(()=>{_pageCache.clear();_buildingKey=null;rebuildPages();},350);
+    if(sentences.length) setTimeout(()=>{clearAllPageCache();_buildingKey=null;rebuildPages();},350);
   }else{
     document.body.classList.remove('reader-fullscreen');
-    _pageCache.clear();_buildingKey=null;
+    clearAllPageCache();_buildingKey=null;
     if(p==='stats') document.getElementById('stats-page').style.display='flex';
     else if(p==='calendar') document.getElementById('calendar-page').style.display='flex';
   }
@@ -2157,12 +2157,69 @@ function calculatePageEnd(startOffset, isVert, areaW, areaH){
   return Math.min(startOffset+result, totalLen);
 }
 
-// ── 分頁快取 ──
-const _pageCache=new Map(); // key -> {pages, sentencePageMap}
-let _buildingKey=null; // 目前正在計算的 key，避免重複觸發
+// ── 分頁快取（記憶體 + IndexedDB 持久化）──
+const _pageCache=new Map(); // 記憶體快取，命中最快
+let _buildingKey=null;
 
 function getCacheKey(isVert, areaW, areaH, fs, lh, flatLen){
   return `${isVert?'v':'h'}_${Math.round(areaW)}_${Math.round(areaH)}_${fs}_${lh}_${flatLen}`;
+}
+
+// ── IndexedDB 初始化 ──
+const IDB_NAME='nnjy_pagecache';
+const IDB_STORE='pages';
+const IDB_VERSION=1;
+let _idb=null;
+
+function openIDB(){
+  if(_idb) return Promise.resolve(_idb);
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)){
+        db.createObjectStore(IDB_STORE, {keyPath:'key'});
+      }
+    };
+    req.onsuccess=e=>{ _idb=e.target.result; resolve(_idb); };
+    req.onerror=()=>reject(req.error);
+  });
+}
+
+function idbGet(key){
+  return openIDB().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(IDB_STORE,'readonly');
+    const req=tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=()=>resolve(null); // 讀取失敗不影響主流程
+  })).catch(()=>null);
+}
+
+function idbSet(key, data){
+  return openIDB().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put({key, ...data, ts:Date.now()});
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>resolve(); // 寫入失敗不影響主流程
+  })).catch(()=>{});
+}
+
+function idbDelete(key){
+  return openIDB().then(db=>new Promise(resolve=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>resolve();
+  })).catch(()=>{});
+}
+
+// 清除所有分頁快取（IndexedDB + 記憶體）
+function clearAllPageCache(){
+  _pageCache.clear();
+  openIDB().then(db=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).clear();
+  }).catch(()=>{});
 }
 
 function buildPages(onDone){
@@ -2180,7 +2237,6 @@ function buildPages(onDone){
   const areaH=Math.max(1,area.clientHeight-padV);
 
   if(areaW<=1||areaH<=1){
-    // 延遲重試時不清除 pendingRestorePos
     setTimeout(()=>{buildPages(onDone);},120); return;
   }
   if(areaH<200){
@@ -2192,69 +2248,80 @@ function buildPages(onDone){
   const tcStyle=getComputedStyle(tc);
   const cacheKey=getCacheKey(isVert,areaW,areaH,tcStyle.fontSize,tcStyle.lineHeight,_flatText.length);
 
-  // ── 快取命中：直接套用 ──
+  // ── 1. 記憶體快取命中 ──
   if(_pageCache.has(cacheKey)){
     const cached=_pageCache.get(cacheKey);
     pages=cached.pages;
     sentencePageMap=cached.sentencePageMap;
-    console.log(`分頁快取命中：${pages.length}頁`);
+    console.log(`[快取] 記憶體命中：${pages.length}頁`);
     if(onDone)onDone();
     return;
   }
 
-  // ── 快取未命中：分批非同步計算 ──
-  // 若有舊的計算在跑（不同 key），讓它繼續但忽略結果，重新開始
-  _buildingKey=cacheKey;
-
-  const totalSent=sentences.length;
-  const newPages=[];
-  const newSentencePageMap={};
-  let charOffset=0;
-  let pageIdx=0;
-  const totalLen=_flatText.length;
-
-  showToast('計算分頁中…',99999);
-
-  function processChunk(){
-    // 若 key 已被新的計算取代，放棄此次結果
-    if(_buildingKey!==cacheKey) return;
-
-    const CHUNK=5;
-    let count=0;
-    while(charOffset<totalLen && count<CHUNK){
-      const endOffset=calculatePageEnd(charOffset, isVert, areaW, areaH);
-      if(endOffset<=charOffset){ charOffset++; continue; }
-      for(let i=0;i<_sentBoundaries.length;i++){
-        const b=_sentBoundaries[i];
-        if(b.start>=endOffset) break;
-        if(b.end>charOffset && !(i in newSentencePageMap)){
-          newSentencePageMap[i]=pageIdx;
-        }
-      }
-      newPages.push({startOffset:charOffset, endOffset});
-      pageIdx++;
-      charOffset=endOffset;
-      count++;
-    }
-
-    if(charOffset<totalLen){
-      setTimeout(processChunk, 0);
-    }else{
-      _buildingKey=null;
-      _pageCache.set(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
-      if(_pageCache.size>8){
-        _pageCache.delete(_pageCache.keys().next().value);
-      }
-      pages=newPages;
-      sentencePageMap=newSentencePageMap;
-      const t=document.getElementById('_toast');
-      if(t) t.style.opacity='0';
-      console.log(`分頁完成：${pages.length}頁，共${sentences.length}句`);
+  // ── 2. IndexedDB 快取查詢 ──
+  idbGet(cacheKey).then(cached=>{
+    if(cached && cached.pages && cached.sentencePageMap){
+      pages=cached.pages;
+      sentencePageMap=cached.sentencePageMap;
+      // 同時寫回記憶體快取
+      _pageCache.set(cacheKey,{pages,sentencePageMap});
+      console.log(`[快取] IndexedDB 命中：${pages.length}頁`);
       if(onDone)onDone();
+      return;
     }
-  }
 
-  setTimeout(processChunk, 0);
+    // ── 3. 快取未命中：分批非同步計算 ──
+    _buildingKey=cacheKey;
+
+    const newPages=[];
+    const newSentencePageMap={};
+    let charOffset=0;
+    let pageIdx=0;
+    const totalLen=_flatText.length;
+
+    showToast('計算分頁中…',99999);
+
+    function processChunk(){
+      if(_buildingKey!==cacheKey) return;
+
+      const CHUNK=5;
+      let count=0;
+      while(charOffset<totalLen && count<CHUNK){
+        const endOffset=calculatePageEnd(charOffset, isVert, areaW, areaH);
+        if(endOffset<=charOffset){ charOffset++; continue; }
+        for(let i=0;i<_sentBoundaries.length;i++){
+          const b=_sentBoundaries[i];
+          if(b.start>=endOffset) break;
+          if(b.end>charOffset && !(i in newSentencePageMap)){
+            newSentencePageMap[i]=pageIdx;
+          }
+        }
+        newPages.push({startOffset:charOffset, endOffset});
+        pageIdx++;
+        charOffset=endOffset;
+        count++;
+      }
+
+      if(charOffset<totalLen){
+        setTimeout(processChunk, 0);
+      }else{
+        _buildingKey=null;
+        // 寫入記憶體快取
+        _pageCache.set(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
+        if(_pageCache.size>8) _pageCache.delete(_pageCache.keys().next().value);
+        // 寫入 IndexedDB（非同步，不阻塞主流程）
+        idbSet(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
+        pages=newPages;
+        sentencePageMap=newSentencePageMap;
+        const t=document.getElementById('_toast');
+        if(t) t.style.opacity='0';
+        console.log(`[分頁] 計算完成：${pages.length}頁，共${sentences.length}句，已存 IndexedDB`);
+        if(onDone)onDone();
+      }
+    }
+
+    setTimeout(processChunk, 0);
+  });
 }
 
 function showPage_num(p,noAnim){
@@ -2376,7 +2443,7 @@ let rebuildTimer=null;
 function rebuildPages(){
   if(!sentences.length)return;
   clearTimeout(rebuildTimer);
-  _pageCache.clear();
+  clearAllPageCache();
   _buildingKey=null;
   const savedOffset=pages[currentPage]?.startOffset??0;
   rebuildTimer=setTimeout(()=>{
@@ -2638,7 +2705,7 @@ function showToast(msg,duration=1800){
 }
 
 function scheduleRebuild(){
-  _pageCache.clear(); // 設定改變，清除所有快取
+  clearAllPageCache(); // 設定改變，清除所有快取
   _buildingKey=null;
   if(_rebuildTimer) clearTimeout(_rebuildTimer);
   // 若超過 500ms 還沒完成，顯示提示
