@@ -1133,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.4.9</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.0</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1941,8 +1941,7 @@ function showPage(p){
     document.getElementById('reader').classList.add('show');
     document.getElementById('chant-float').classList.add('show');
     document.body.classList.add('reader-fullscreen');
-    // 全螢幕後尺寸改變，清記憶體快取重算（IDB 保留，新結果會覆寫）
-    if(sentences.length) setTimeout(()=>{clearMemCache();_buildingKey=null;rebuildPages();},350);
+    // renderPage 會在 500ms 後執行 buildPages，不需要在這裡額外觸發
   }else{
     document.body.classList.remove('reader-fullscreen');
     clearMemCache();_buildingKey=null;
@@ -2239,8 +2238,8 @@ function idbSet(key, data){
     const tx=db.transaction(IDB_STORE,'readwrite');
     tx.objectStore(IDB_STORE).put({key, ...data, ts:Date.now()});
     tx.oncomplete=()=>resolve();
-    tx.onerror=()=>resolve(); // 寫入失敗不影響主流程
-  })).catch(()=>{});
+    tx.onerror=e=>{console.error('[IDB] 寫入失敗：',e.target.error);resolve();}
+  })).catch(e=>{console.error('[IDB] openIDB 失敗：',e);});
 }
 
 function idbDelete(key){
