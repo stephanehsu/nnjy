@@ -303,6 +303,21 @@ html,body{
 }
 #reader-back-btn:active{opacity:.6;}
 body.reader-fullscreen #reader-back-btn{display:flex;}
+
+/* 全螢幕遍數顯示 */
+#reader-lap-count{
+  display:none;
+  position:fixed;top:8px;right:8px;z-index:520;
+  padding:4px 10px;border-radius:20px;
+  background:rgba(58,37,16,0.55);
+  border:1px solid rgba(200,152,40,0.25);
+  color:var(--accent);font-size:13px;
+  font-family:var(--font-main);letter-spacing:.1em;
+  backdrop-filter:blur(4px);
+  writing-mode:horizontal-tb;
+  pointer-events:none;
+}
+body.reader-fullscreen #reader-lap-count{display:block;}
 body.reader-fullscreen #topbar{
   transform:translateY(-100%);
   transition:transform .35s cubic-bezier(0.4,0,0.2,1);
@@ -1116,7 +1131,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.7</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.8</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1154,6 +1169,7 @@ body.reader-fullscreen #book-left{
   <div id="reader">
     <!-- 全螢幕返回鈕 -->
     <button id="reader-back-btn" onclick="stopChant();showPage('welcome')">‹</button>
+    <div id="reader-lap-count"></div>
     <div id="book-wrap">
       <div id="book-left">
         <div id="book-title" class="book-title-text"></div>
@@ -2440,7 +2456,7 @@ function renderPage(){
         if(pendingRestorePos){
           const sent=Math.min(pendingRestorePos.sent,sentences.length-1);
           currentIdx=sent;
-          const p=sentencePageMap[sent]??0;
+          const p=sentencePageMap[sent]??pendingRestorePos.page??0;
           currentPage=-1;
           showPage_num(p,true);
           updateProgress();
@@ -2523,32 +2539,20 @@ function startRAF(){
           nextFireAt=now+calcDelay();
         }
       }else{
-        // 念完一遍
-        const isChant=currentCategory==='佛號短咒';
-        const shouldLoop=isChant&&ttsEnabled; // 佛號短咒+人聲才循環
+        // 念完一遍 → 記錄，然後循環回開頭繼續播放
         if(currentTitle)recordLap(currentTitle);
-
-        if(shouldLoop){
-          currentIdx=0;
-          currentPage=-1;
-          showPage_num(0,true);
-          updateProgress();
-          if(ttsEnabled){
-            nextFireAt=Infinity;
-            speak(sentences[0],()=>{
-              if(!isPlaying){return;}
-              nextFireAt=performance.now()+calcDelay();
-            });
-          }else{
-            nextFireAt=now+calcDelay();
-          }
+        currentIdx=0;
+        currentPage=-1;
+        showPage_num(0,true);
+        updateProgress();
+        if(ttsEnabled){
+          nextFireAt=Infinity;
+          speak(sentences[0],()=>{
+            if(!isPlaying){return;}
+            nextFireAt=performance.now()+calcDelay();
+          });
         }else{
-          // 不循環：停止
-          stopChant();
-          currentIdx=0;currentPage=-1;
-          showPage_num(0,false);
-          updateProgress();
-          return;
+          nextFireAt=now+calcDelay();
         }
       }
     }
@@ -3167,8 +3171,16 @@ function updateLapDisplay(title){
   }else{
     el.innerHTML='';
   }
+  // 同步更新全螢幕遍數
+  const rc=document.getElementById('reader-lap-count');
+  if(rc){
+    if(cur>0){
+      rc.textContent = goal>0 ? `${cur} / ${goal} 遍` : `第 ${cur} 遍`;
+    }else{
+      rc.textContent='';
+    }
+  }
 }
-
 // 儲存閱讀位置
 function saveReadPos(title,pageIdx,sentIdx){
   if(!title)return;
@@ -3501,20 +3513,64 @@ function importSutra(encodedTitle,encodedFolder,encodedCat){
 document.getElementById('btn-calendar').addEventListener('click',()=>{showCalendarPage();});
 
 // ── 念誦浮球 ──
-document.getElementById('chant-ball').addEventListener('click',function(e){
-  e.stopPropagation();
-  panelOpen=!panelOpen;
-  document.getElementById('chant-panel').classList.toggle('open',panelOpen);
-  // 不自動播放，讓使用者自己按播放鍵
-});
+// ── 念誦浮球：短按播放/停止，長按開設定面板 ──
+(function(){
+  const ball = document.getElementById('chant-ball');
+  let pressTimer = null;
+  let longPressed = false;
 
-// 點擊其他地方收起面板
-document.addEventListener('click',function(e){
-  if(!document.getElementById('chant-float').contains(e.target)){
-    panelOpen=false;
+  function openPanel(){
+    panelOpen = true;
+    document.getElementById('chant-panel').classList.add('open');
+  }
+  function closePanel(){
+    panelOpen = false;
     document.getElementById('chant-panel').classList.remove('open');
   }
-});
+
+  ball.addEventListener('pointerdown', function(e){
+    longPressed = false;
+    pressTimer = setTimeout(()=>{
+      longPressed = true;
+      // 長按：切換面板
+      if(panelOpen){ closePanel(); } else { openPanel(); }
+    }, 450);
+  });
+
+  ball.addEventListener('pointerup', function(e){
+    clearTimeout(pressTimer);
+    if(longPressed) return; // 長按已處理
+    // 短按：播放/停止
+    e.stopPropagation();
+    if(!sentences.length) return;
+    if(!chantActive){
+      startChant();
+    } else if(isPlaying){
+      isPlaying = false;
+      if(rafId){cancelAnimationFrame(rafId);rafId=null;}
+      document.getElementById('btn-play').textContent='▶';
+      ball.classList.remove('playing');
+      if(window.speechSynthesis) speechSynthesis.cancel();
+    } else {
+      isPlaying = true;
+      document.getElementById('btn-play').textContent='⏸';
+      ball.classList.add('playing');
+      if(ttsEnabled) speak(sentences[currentIdx]);
+      if(chantMode==='auto') startRAF();
+    }
+  });
+
+  ball.addEventListener('pointercancel', function(){
+    clearTimeout(pressTimer);
+  });
+
+  // 點擊其他地方收起面板
+  document.addEventListener('click', function(e){
+    if(!document.getElementById('chant-float').contains(e.target)){
+      closePanel();
+    }
+  });
+})();
 
 // ── 播放按鈕 ──
 document.getElementById('btn-play').addEventListener('click',function(e){
