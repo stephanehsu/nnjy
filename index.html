@@ -1133,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.2</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.3</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2481,10 +2481,16 @@ function showPage_num(p,noAnim){
 }
 
 function renderPage(){
-  // 等畫面完全穩定（全螢幕動畫、底部 bar 消失等）再計算分頁
-  setTimeout(()=>{
-    requestAnimationFrame(()=>{
-      buildPages(()=>{
+  // 等畫面尺寸穩定後再計算分頁（輪詢偵測，最多等 1.5 秒）
+  let _lastH=0, _stable=0;
+  const _poll=setInterval(()=>{
+    const area=document.getElementById('reading-area');
+    const h=area?area.clientHeight:0;
+    if(h>0 && h===_lastH){ _stable++; } else { _stable=0; _lastH=h; }
+    if(_stable>=3){ // 連續 3 次（300ms）尺寸不變，視為穩定
+      clearInterval(_poll);
+      requestAnimationFrame(()=>{
+        buildPages(()=>{
         if(pendingRestorePos){
           const sent=Math.min(pendingRestorePos.sent,sentences.length-1);
           currentIdx=sent;
@@ -2499,7 +2505,8 @@ function renderPage(){
         updateLapBtn();
       });
     });
-  }, 500);
+    }
+  }, 100);
 }
 
 // ── 分頁重建（保存 startOffset，確保切換方向/字體/旋轉後進度不丟失）──
