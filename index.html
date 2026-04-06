@@ -128,26 +128,12 @@ onAuthStateChanged(auth, user => {
 // ── 收集所有本機資料 ──
 function collectLocalData() {
   const get = k => { try { return JSON.parse(localStorage.getItem(k)) } catch { return null } };
-  const tc = document.getElementById('text-container');
-  const dir = tc ? (tc.style.writingMode === 'horizontal-tb' ? 'horizontal' : 'vertical') : 'vertical';
-  const activeFont = document.querySelector('.font-item.active');
   return {
     sutra_library:    get('sutra_library')    || [],
     nnjy_stats:       get('nnjy_stats')       || [],
     nnjy_goals:       get('nnjy_goals')       || {},
-    nnjy_pos:         get('nnjy_pos')         || {},
     nnjy_laps:        get('nnjy_laps')        || {},
     nnjy_cur_laps:    get('nnjy_cur_laps')    || {},
-    nnjy_rosary:      localStorage.getItem('nnjy_rosary') || 'btn',
-    settings: {
-      fontSize:    window._fontSize  || 25,
-      lineHeight:  window._lineHeight || 2.2,
-      direction:   dir,
-      font:        activeFont ? activeFont.dataset.font : "'LXGW WenKai TC',serif",
-      punct:       document.getElementById('punct-input')?.value || '',
-      ttsEnabled:  window.ttsEnabled || false,
-      chantSpeed:  window.chantSpeed || 400,
-    },
     _localTs: Date.now(),
   };
 }
@@ -215,11 +201,8 @@ function mergeData(cloud, local) {
     sutra_library: Object.values(libMap),
     nnjy_stats:    Object.values(statsMap),
     nnjy_goals:    cloudNewer ? (cloud.nnjy_goals || local.nnjy_goals) : (local.nnjy_goals || cloud.nnjy_goals),
-    nnjy_pos:      cloudNewer ? (cloud.nnjy_pos   || local.nnjy_pos)   : (local.nnjy_pos   || cloud.nnjy_pos),
     nnjy_laps:     cloudNewer ? (cloud.nnjy_laps  || local.nnjy_laps)  : (local.nnjy_laps  || cloud.nnjy_laps),
     nnjy_cur_laps: cloudNewer ? (cloud.nnjy_cur_laps || local.nnjy_cur_laps) : (local.nnjy_cur_laps || cloud.nnjy_cur_laps),
-    nnjy_rosary:   cloudNewer ? (cloud.nnjy_rosary || local.nnjy_rosary) : (local.nnjy_rosary || cloud.nnjy_rosary),
-    settings:      cloudNewer ? (cloud.settings   || local.settings)   : (local.settings   || cloud.settings),
   };
 }
 
@@ -228,32 +211,8 @@ function applyData(d) {
   localStorage.setItem('sutra_library',  JSON.stringify(d.sutra_library));
   localStorage.setItem('nnjy_stats',     JSON.stringify(d.nnjy_stats));
   localStorage.setItem('nnjy_goals',     JSON.stringify(d.nnjy_goals));
-  localStorage.setItem('nnjy_pos',       JSON.stringify(d.nnjy_pos));
   localStorage.setItem('nnjy_laps',      JSON.stringify(d.nnjy_laps));
   localStorage.setItem('nnjy_cur_laps',  JSON.stringify(d.nnjy_cur_laps));
-  localStorage.setItem('nnjy_rosary',    d.nnjy_rosary || 'btn');
-
-  if(d.settings) {
-    const s = d.settings;
-    if(s.fontSize)   { window.setFontSize   && setFontSize(s.fontSize); }
-    if(s.lineHeight) { window.setLineHeight && setLineHeight(s.lineHeight); }
-    if(s.direction)  { window.setDirection  && setDirection(s.direction); }
-    if(s.font) {
-      const fi = document.querySelector(`.font-item[data-font="${s.font}"]`);
-      if(fi) setFont(fi);
-    }
-    if(s.punct !== undefined) {
-      const pi = document.getElementById('punct-input');
-      if(pi) { pi.value = s.punct; window.customPunct = s.punct || window.DEFAULT_PUNCT; }
-    }
-    if(s.ttsEnabled !== undefined) {
-      window.ttsEnabled = s.ttsEnabled;
-      document.getElementById('tts-toggle')?.classList.toggle('on', s.ttsEnabled);
-      const btn = document.getElementById('btn-tts');
-      if(btn) btn.textContent = s.ttsEnabled ? '🔊' : '🔇';
-    }
-    if(s.chantSpeed) window.chantSpeed = s.chantSpeed;
-  }
   // 重新渲染書庫
   if(typeof renderLib === 'function') renderLib();
 }
@@ -1133,7 +1092,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.3</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.6</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1899,7 +1858,7 @@ function setFont(el){
   document.querySelectorAll('.font-item').forEach(f=>f.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('text-container').style.fontFamily=el.dataset.font;
-  clearAllPageCache(); // 字型改變，清 IDB
+  clearAllPageCache();
   rebuildPages();
 }
 function openSettings(){
@@ -2225,33 +2184,52 @@ function openIDB(){
 }
 
 function idbGet(key){
-  return openIDB().then(db=>new Promise((resolve,reject)=>{
-    const tx=db.transaction(IDB_STORE,'readonly');
-    const req=tx.objectStore(IDB_STORE).get(key);
-    req.onsuccess=()=>{
-      console.log('[idbGet raw]', key, '→', req.result ? 'found pages:'+req.result.pages?.length : 'undefined');
-      resolve(req.result||null);
+  // 每次開新連線，避免快取的 _idb 連線失效導致靜默回 undefined
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)){
+        db.createObjectStore(IDB_STORE,{keyPath:'key'});
+      }
+    };
+    req.onsuccess=e=>{
+      const db=e.target.result;
+      const tx=db.transaction(IDB_STORE,'readonly');
+      const r=tx.objectStore(IDB_STORE).get(key);
+      r.onsuccess=()=>{
+        console.log('[idbGet raw]',key,'→',r.result?'found pages:'+r.result.pages?.length:'undefined');
+        resolve(r.result||null);
+        db.close();
+      };
+      r.onerror=()=>{resolve(null);db.close();};
     };
     req.onerror=()=>resolve(null);
-  })).catch(()=>null);
+  }).catch(()=>null);
 }
 
 function idbSet(key, data){
-  return openIDB().then(db=>new Promise((resolve,reject)=>{
-    const tx=db.transaction(IDB_STORE,'readwrite');
-    tx.objectStore(IDB_STORE).put({key, ...data, ts:Date.now()});
-    tx.oncomplete=()=>{
-      console.log('[idbSet] 寫入完成，驗證讀取...');
-      // 立刻驗證
-      openIDB().then(db2=>{
-        const tx2=db2.transaction(IDB_STORE,'readonly');
-        const req=tx2.objectStore(IDB_STORE).get(key);
-        req.onsuccess=()=>console.log('[idbSet驗證]', key, req.result ? '✓ 存在 pages:'+req.result.pages?.length : '✗ 不存在！');
-      });
-      resolve();
+  return new Promise((resolve)=>{
+    const req=indexedDB.open(IDB_NAME, IDB_VERSION);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(IDB_STORE)){
+        db.createObjectStore(IDB_STORE,{keyPath:'key'});
+      }
     };
-    tx.onerror=e=>{console.error('[IDB] 寫入失敗：',e.target.error);resolve();}
-  })).catch(e=>{console.error('[IDB] openIDB 失敗：',e);});
+    req.onsuccess=e=>{
+      const db=e.target.result;
+      const tx=db.transaction(IDB_STORE,'readwrite');
+      tx.objectStore(IDB_STORE).put({key,...data,ts:Date.now()});
+      tx.oncomplete=()=>{
+        console.log('[idbSet] 寫入完成 pages:'+data.pages?.length);
+        db.close();
+        resolve();
+      };
+      tx.onerror=e=>{console.error('[IDB] 寫入失敗：',e.target.error);db.close();resolve();};
+    };
+    req.onerror=()=>resolve();
+  }).catch(()=>{});
 }
 
 function idbDelete(key){
@@ -2701,7 +2679,6 @@ function setDirection(dir){
     tc.style.height='';tc.style.minHeight='';
     area.style.overflowX='hidden';area.style.overflowY='hidden';
     area.style.justifyContent='flex-end';
-    // 直排：左=下一頁(›方向)，右=上一頁(‹方向)
     document.querySelector('#page-prev-zone .page-arrow').textContent='‹';
     document.querySelector('#page-next-zone .page-arrow').textContent='›';
   }else{
@@ -2710,11 +2687,10 @@ function setDirection(dir){
     area.style.overflowX='hidden';area.style.overflowY='auto';
     area.style.justifyContent='flex-start';
     area.scrollTop=0;
-    // 橫排：左=上一頁(‹)，右=下一頁(›)
     document.querySelector('#page-prev-zone .page-arrow').textContent='‹';
     document.querySelector('#page-next-zone .page-arrow').textContent='›';
   }
-  clearAllPageCache(); // 排版方向改變，清 IDB
+  clearAllPageCache();
   rebuildPages();
 }
 // 字體大小範圍
