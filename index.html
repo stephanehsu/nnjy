@@ -79,6 +79,8 @@ function clearDirty() {
   _isDirty = false;
   localStorage.removeItem('nnjy_isDirty');
 }
+window.markDirty = markDirty;
+window.clearDirty = clearDirty;
 
 function startAutoSync() {
   if(_autoSyncTimer) clearInterval(_autoSyncTimer);
@@ -1123,7 +1125,7 @@ body.reader-fullscreen #book-left{
       從左側滑出要念誦的經文
     </div>
     <!-- 安裝按鈕：永遠顯示 -->
-    <button id="btn-install" onclick="triggerInstall()"
+    <button id="btn-install"
       style="display:block;margin-top:1rem;padding:10px 24px;
              border-radius:20px;background:transparent;
              border:1px solid var(--border);color:var(--text3);
@@ -1131,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.9</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.4.5</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2195,7 +2197,11 @@ const _pageCache=new Map(); // 記憶體快取，命中最快
 let _buildingKey=null;
 
 function getCacheKey(isVert, areaW, areaH, fs, lh, flatLen){
-  return `${isVert?'v':'h'}_${Math.round(areaW)}_${Math.round(areaH)}_${fs}_${lh}_${flatLen}`;
+  // 只用排版方向、字型設定、文字長度作為 key
+  // 不納入畫面尺寸：鍵盤收起/全螢幕切換會造成 50px+ 差異，導致永遠 miss
+  const rFs=parseFloat(fs).toFixed(1);
+  const rLh=parseFloat(lh).toFixed(2);
+  return `${isVert?'v':'h'}_${rFs}_${rLh}_${flatLen}`;
 }
 
 // ── IndexedDB 初始化 ──
@@ -2298,13 +2304,19 @@ function buildPages(onDone){
   // ── 2. IndexedDB 快取查詢 ──
   idbGet(cacheKey).then(cached=>{
     if(cached && cached.pages && cached.sentencePageMap){
-      pages=cached.pages;
-      sentencePageMap=cached.sentencePageMap;
-      // 同時寫回記憶體快取
-      _pageCache.set(cacheKey,{pages,sentencePageMap});
-      console.log(`[快取] IndexedDB 命中：${pages.length}頁`);
-      if(onDone)onDone();
-      return;
+      // 驗證快取的分頁尺寸是否與現在螢幕接近（容許 20% 差異）
+      const stale = cached.areaW && cached.areaH &&
+        (Math.abs(cached.areaW - areaW) > areaW * 0.2 ||
+         Math.abs(cached.areaH - areaH) > areaH * 0.2);
+      if(!stale){
+        pages=cached.pages;
+        sentencePageMap=cached.sentencePageMap;
+        _pageCache.set(cacheKey,{pages,sentencePageMap});
+        console.log(`[快取] IndexedDB 命中：${pages.length}頁`);
+        if(onDone)onDone();
+        return;
+      }
+      console.log(`[快取] 尺寸不符，重算`);
     }
 
     // ── 3. 快取未命中：分批非同步計算 ──
@@ -2346,8 +2358,8 @@ function buildPages(onDone){
         // 寫入記憶體快取
         _pageCache.set(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
         if(_pageCache.size>8) _pageCache.delete(_pageCache.keys().next().value);
-        // 寫入 IndexedDB（非同步，不阻塞主流程）
-        idbSet(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap});
+        // 寫入 IndexedDB（cacheKey 已不含尺寸，直接覆寫即可）
+        idbSet(cacheKey, {pages:newPages, sentencePageMap:newSentencePageMap, areaW, areaH});
         pages=newPages;
         sentencePageMap=newSentencePageMap;
         const t=document.getElementById('_toast');
@@ -2365,7 +2377,6 @@ function showPage_num(p,noAnim){
   if(!pages.length)return;
   p=Math.max(0,Math.min(p,pages.length-1));
   currentPage=p;
-  if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
   const pg=document.getElementById('book-page-num');
   if(pg)pg.textContent=p+1;
   const c=document.getElementById('text-container');
@@ -2449,9 +2460,18 @@ function showPage_num(p,noAnim){
       }
     });
   };
-  if(noAnim){c.style.transition='none';c.style.opacity='1';doRender();return;}
+  if(noAnim){
+    c.style.transition='none';c.style.opacity='1';
+    doRender();
+    if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
+    return;
+  }
   c.style.transition='opacity .2s';c.style.opacity='0';
-  setTimeout(()=>{doRender();c.style.opacity='1';},200);
+  setTimeout(()=>{
+    doRender();
+    c.style.opacity='1';
+    if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
+  },200);
 }
 
 function renderPage(){
@@ -2651,9 +2671,9 @@ function onSentenceClick(idx){
   if(ttsEnabled)speak(sentences[idx]);
 }
 
-window.addEventListener('resize',()=>{if(sentences.length)rebuildPages();});
+window.addEventListener('resize',()=>{if(sentences.length)rebuildPages();updateLapBtn();});
 if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',()=>{if(sentences.length)rebuildPages();});
+  window.visualViewport.addEventListener('resize',()=>{if(sentences.length)rebuildPages();updateLapBtn();});
 }
 
 
@@ -3105,14 +3125,6 @@ function recordLap(title){
     const usingRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
     const noWoodfish=(currentCategory==='佛號短咒'&&ttsEnabled)||usingRosary;
     if(!noWoodfish) playLapSound();
-    // 佛教經典：加1遍後跳回第1頁
-    if(currentCategory==='佛教經典'&&pages.length>1){
-      setTimeout(()=>{
-        currentIdx=0;currentPage=-1;
-        showPage_num(0,false);
-        updateProgress();
-      },200);
-    }
   }
   // 停手 10 秒後靜默推送（debounce，避免高頻念佛連續寫入）
   markDirty();
@@ -3563,6 +3575,13 @@ document.getElementById('btn-calendar').addEventListener('click',()=>{showCalend
       ball.textContent='誦';
       if(window.speechSynthesis) speechSynthesis.cancel();
     } else {
+      // 若停在最後一句，先跳回開頭
+      if(currentIdx>=sentences.length-1){
+        currentIdx=0;
+        currentPage=-1;
+        showPage_num(0,true);
+        updateProgress();
+      }
       isPlaying = true;
       document.getElementById('btn-play').textContent='⏸';
       ball.classList.add('playing');
@@ -3594,10 +3613,19 @@ document.getElementById('btn-play').addEventListener('click',function(e){
     if(rafId){cancelAnimationFrame(rafId);rafId=null;}
     this.textContent='▶';
     document.getElementById('chant-ball').classList.remove('playing');
+    document.getElementById('chant-ball').textContent='誦';
     if(window.speechSynthesis)speechSynthesis.cancel();
   }else{
+    // 若停在最後一句（念完狀態），先跳回開頭再繼續，避免立刻觸發 recordLap
+    if(currentIdx>=sentences.length-1){
+      currentIdx=0;
+      currentPage=-1;
+      showPage_num(0,true);
+      updateProgress();
+    }
     isPlaying=true;this.textContent='⏸';
     document.getElementById('chant-ball').classList.add('playing');
+    document.getElementById('chant-ball').textContent='⏹';
     if(ttsEnabled)speak(sentences[currentIdx]);
     if(chantMode==='auto')startRAF();
   }
@@ -3629,23 +3657,25 @@ function updateLapBtn(){
 }
 function goNextPage(){
   if(currentPage<pages.length-1){
-    showPage_num(currentPage+1);
-    // 跳到下一頁第一個句子
-    const pg=pages[currentPage];
+    const nextP=currentPage+1;
+    // 先更新 currentIdx，showPage_num 裡的 saveReadPos 才能存到正確位置
+    const pg=pages[nextP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
+    showPage_num(nextP);
     updateProgress();
   }else{
-    showPage_num(0);
     currentIdx=0;
+    showPage_num(0);
     updateProgress();
   }
   updateLapBtn();
 }
 function goPrevPage(){
   if(currentPage>0){
-    showPage_num(currentPage-1);
-    const pg=pages[currentPage];
+    const prevP=currentPage-1;
+    const pg=pages[prevP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
+    showPage_num(prevP);
     updateProgress();
   }
   updateLapBtn();
@@ -3667,6 +3697,12 @@ document.getElementById('btn-manual-lap').addEventListener('click',function(e){
   playLapSound(); // 按鈕永遠播木魚聲
   this.style.transform='scale(1.2)';
   setTimeout(()=>{this.style.transform='';},180);
+  // 跳回第一頁第一句
+  if(pages.length>1){
+    currentIdx=0;currentPage=-1;
+    showPage_num(0,false);
+    updateProgress();
+  }
 });
 document.getElementById('page-prev-zone').addEventListener('click',function(e){
   e.stopPropagation();
@@ -3749,12 +3785,11 @@ if('serviceWorker' in navigator && location.protocol !== 'file:'){
   });
 }
 
-// ── PWA 安裝提示 ──
-let _installPrompt=null;
+// ── 安裝按鈕 ──
+document.getElementById('btn-install').addEventListener('click', triggerInstall);
 window.addEventListener('beforeinstallprompt',e=>{
   e.preventDefault();
   _installPrompt=e;
-  // 顯示安裝提示條和歡迎頁按鈕
   const bar=document.getElementById('install-bar');
   if(bar) bar.style.display='flex';
   const btn=document.getElementById('btn-install');
@@ -3767,21 +3802,25 @@ window.addEventListener('appinstalled',()=>{
   if(btn) btn.style.display='none';
   _installPrompt=null;
 });
+// 若已以 PWA standalone 模式運行，隱藏安裝按鈕
+if(window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true){
+  const btn=document.getElementById('btn-install');
+  if(btn) btn.style.display='none';
+}
 function triggerInstall(){
   if(_installPrompt){
     _installPrompt.prompt();
     _installPrompt.userChoice.then(()=>{
       _installPrompt=null;
-      document.getElementById('install-bar').style.display='none';
-      document.getElementById('btn-install').style.display='none';
+      const bar=document.getElementById('install-bar');
+      if(bar) bar.style.display='none';
+      const btn=document.getElementById('btn-install');
+      if(btn) btn.style.display='none';
     });
     return;
   }
-  // 顯示手動安裝說明
+  // 無系統 prompt（file:// 或 iOS）→ 顯示手動安裝說明
   document.getElementById('install-guide-overlay').style.display='flex';
-}
-function closeInstallGuide(){
-  document.getElementById('install-guide-overlay').style.display='none';
 }
 
 // ══ 雲端同步 UI ══
