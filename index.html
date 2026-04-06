@@ -1133,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.1</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.2</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2240,7 +2240,16 @@ function idbSet(key, data){
   return openIDB().then(db=>new Promise((resolve,reject)=>{
     const tx=db.transaction(IDB_STORE,'readwrite');
     tx.objectStore(IDB_STORE).put({key, ...data, ts:Date.now()});
-    tx.oncomplete=()=>resolve();
+    tx.oncomplete=()=>{
+      console.log('[idbSet] 寫入完成，驗證讀取...');
+      // 立刻驗證
+      openIDB().then(db2=>{
+        const tx2=db2.transaction(IDB_STORE,'readonly');
+        const req=tx2.objectStore(IDB_STORE).get(key);
+        req.onsuccess=()=>console.log('[idbSet驗證]', key, req.result ? '✓ 存在 pages:'+req.result.pages?.length : '✗ 不存在！');
+      });
+      resolve();
+    };
     tx.onerror=e=>{console.error('[IDB] 寫入失敗：',e.target.error);resolve();}
   })).catch(e=>{console.error('[IDB] openIDB 失敗：',e);});
 }
