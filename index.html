@@ -307,13 +307,13 @@ body.reader-fullscreen #reader-back-btn{display:flex;}
 /* 全螢幕遍數顯示 */
 #reader-lap-count{
   display:none;
-  position:fixed;top:8px;right:8px;z-index:520;
-  padding:4px 10px;border-radius:20px;
-  background:rgba(58,37,16,0.55);
-  border:1px solid rgba(200,152,40,0.25);
-  color:var(--accent);font-size:13px;
-  font-family:var(--font-main);letter-spacing:.1em;
-  backdrop-filter:blur(4px);
+  position:fixed;top:12px;right:12px;z-index:520;
+  padding:5px 14px;border-radius:20px;
+  background:rgba(30,16,4,0.88);
+  border:1px solid rgba(200,152,40,0.6);
+  color:#f0d080;font-size:15px;font-weight:600;
+  font-family:var(--font-main);letter-spacing:.15em;
+  box-shadow:0 2px 10px rgba(0,0,0,.5);
   writing-mode:horizontal-tb;
   pointer-events:none;
 }
@@ -1131,7 +1131,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.8</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.3.9</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1880,8 +1880,8 @@ function openFromLib(encodedTitle){
   if(lapBtn)lapBtn.style.display='none';
   // 先設定恢復位置，renderPage 才能讀到
   const pos=loadReadPos(title);
-  if(pos&&pos.sent>0){
-    pendingRestorePos={sent:pos.sent,page:pos.page||0};
+  if(pos&&(pos.page>0||pos.sent>0)){
+    pendingRestorePos={sent:pos.sent||0,page:pos.page||0};
   }else{
     pendingRestorePos=null;
   }
@@ -1897,6 +1897,7 @@ function setFont(el){
   document.querySelectorAll('.font-item').forEach(f=>f.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('text-container').style.fontFamily=el.dataset.font;
+  clearAllPageCache(); // 字型改變，清 IDB
   rebuildPages();
 }
 function openSettings(){
@@ -2246,6 +2247,10 @@ function idbDelete(key){
 }
 
 // 清除所有分頁快取（IndexedDB + 記憶體）
+function clearMemCache(){
+  _pageCache.clear();
+}
+
 function clearAllPageCache(){
   _pageCache.clear();
   openIDB().then(db=>{
@@ -2475,7 +2480,7 @@ let rebuildTimer=null;
 function rebuildPages(){
   if(!sentences.length)return;
   clearTimeout(rebuildTimer);
-  clearAllPageCache();
+  clearMemCache();   // 只清記憶體快取；IDB 快取保留，讓 buildPages 能命中
   _buildingKey=null;
   const savedOffset=pages[currentPage]?.startOffset??0;
   rebuildTimer=setTimeout(()=>{
@@ -2571,7 +2576,9 @@ function startChant(){
   if(!sentences.length)return;
   chantActive=true;isPlaying=true;
   document.getElementById('btn-play').textContent='⏸';
-  document.getElementById('chant-ball').classList.add('playing');
+  const ball=document.getElementById('chant-ball');
+  ball.classList.add('playing');
+  ball.textContent='⏹';
   updateHighlight();
   if(chantMode==='auto'){
     if(ttsEnabled){
@@ -2596,7 +2603,9 @@ function stopChant(){
   clearTimeout(timer);
   if(rafId){cancelAnimationFrame(rafId);rafId=null;}
   document.getElementById('btn-play').textContent='▶';
-  document.getElementById('chant-ball').classList.remove('playing');
+  const ball=document.getElementById('chant-ball');
+  ball.classList.remove('playing');
+  ball.textContent='誦';
   if(window.speechSynthesis)speechSynthesis.cancel();
 }
 
@@ -2671,6 +2680,7 @@ function setDirection(dir){
     document.querySelector('#page-prev-zone .page-arrow').textContent='‹';
     document.querySelector('#page-next-zone .page-arrow').textContent='›';
   }
+  clearAllPageCache(); // 排版方向改變，清 IDB
   rebuildPages();
 }
 // 字體大小範圍
@@ -2725,7 +2735,7 @@ function showToast(msg,duration=1800){
 }
 
 function scheduleRebuild(){
-  clearAllPageCache(); // 設定改變，清除所有快取
+  clearAllPageCache(); // 設定改變（字號/行距），清記憶體 + IDB
   _buildingKey=null;
   if(_rebuildTimer) clearTimeout(_rebuildTimer);
   // 若超過 500ms 還沒完成，顯示提示
@@ -3539,22 +3549,24 @@ document.getElementById('btn-calendar').addEventListener('click',()=>{showCalend
 
   ball.addEventListener('pointerup', function(e){
     clearTimeout(pressTimer);
-    if(longPressed) return; // 長按已處理
-    // 短按：播放/停止
+    if(longPressed) return;
     e.stopPropagation();
     if(!sentences.length) return;
     if(!chantActive){
       startChant();
+      ball.textContent='⏹';
     } else if(isPlaying){
       isPlaying = false;
       if(rafId){cancelAnimationFrame(rafId);rafId=null;}
       document.getElementById('btn-play').textContent='▶';
       ball.classList.remove('playing');
+      ball.textContent='誦';
       if(window.speechSynthesis) speechSynthesis.cancel();
     } else {
       isPlaying = true;
       document.getElementById('btn-play').textContent='⏸';
       ball.classList.add('playing');
+      ball.textContent='⏹';
       if(ttsEnabled) speak(sentences[currentIdx]);
       if(chantMode==='auto') startRAF();
     }
