@@ -1133,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.0</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.1</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2228,8 +2228,11 @@ function idbGet(key){
   return openIDB().then(db=>new Promise((resolve,reject)=>{
     const tx=db.transaction(IDB_STORE,'readonly');
     const req=tx.objectStore(IDB_STORE).get(key);
-    req.onsuccess=()=>resolve(req.result||null);
-    req.onerror=()=>resolve(null); // 讀取失敗不影響主流程
+    req.onsuccess=()=>{
+      console.log('[idbGet raw]', key, '→', req.result ? 'found pages:'+req.result.pages?.length : 'undefined');
+      resolve(req.result||null);
+    };
+    req.onerror=()=>resolve(null);
   })).catch(()=>null);
 }
 
@@ -2257,6 +2260,7 @@ function clearMemCache(){
 }
 
 function clearAllPageCache(){
+  console.trace('[clearAllPageCache] IDB清除');
   _pageCache.clear();
   openIDB().then(db=>{
     const tx=db.transaction(IDB_STORE,'readwrite');
@@ -2301,17 +2305,18 @@ function buildPages(onDone){
   }
 
   // ── 2. IndexedDB 快取查詢 ──
+  console.log('[IDB查詢] key:', cacheKey);
   idbGet(cacheKey).then(cached=>{
+    console.log('[IDB結果]', cached ? 'pages:'+cached.pages?.length+' sentMap:'+!!cached.sentencePageMap : '無資料');
     if(cached && cached.pages && cached.sentencePageMap){
       pages=cached.pages;
       sentencePageMap=cached.sentencePageMap;
       _pageCache.set(cacheKey,{pages,sentencePageMap});
-      console.log(`[快取] IndexedDB 命中：${pages.length}頁`);
+      console.log('[快取] IndexedDB 命中：'+pages.length+'頁');
       if(onDone)onDone();
       return;
     }
-
-    // ── 3. 快取未命中：分批非同步計算 ──
+    console.log('[快取] Miss，開始計算');
     _buildingKey=cacheKey;
 
     const newPages=[];
