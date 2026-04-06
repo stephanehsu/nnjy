@@ -1133,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.4.7</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.4.9</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2197,11 +2197,11 @@ const _pageCache=new Map(); // 記憶體快取，命中最快
 let _buildingKey=null;
 
 function getCacheKey(isVert, areaW, areaH, fs, lh, flatLen){
-  // 只用排版方向、字型設定、文字長度作為 key
-  // 不納入畫面尺寸：鍵盤收起/全螢幕切換會造成 50px+ 差異，導致永遠 miss
+  const rW=Math.round(areaW/8)*8;  // 8px bucket，容許小幅差異
+  const rH=Math.round(areaH/8)*8;
   const rFs=parseFloat(fs).toFixed(1);
   const rLh=parseFloat(lh).toFixed(2);
-  return `${isVert?'v':'h'}_${rFs}_${rLh}_${flatLen}`;
+  return `${isVert?'v':'h'}_${rW}_${rH}_${rFs}_${rLh}_${flatLen}`;
 }
 
 // ── IndexedDB 初始化 ──
@@ -2304,20 +2304,12 @@ function buildPages(onDone){
   // ── 2. IndexedDB 快取查詢 ──
   idbGet(cacheKey).then(cached=>{
     if(cached && cached.pages && cached.sentencePageMap){
-      // 驗證快取的分頁尺寸是否與現在螢幕接近（容許 20% 差異）
-      // 沒有 areaW 表示舊格式快取，也視為 stale
-      const stale = !cached.areaW || !cached.areaH ||
-        Math.abs(cached.areaW - areaW) > areaW * 0.2 ||
-        Math.abs(cached.areaH - areaH) > areaH * 0.2;
-      if(!stale){
-        pages=cached.pages;
-        sentencePageMap=cached.sentencePageMap;
-        _pageCache.set(cacheKey,{pages,sentencePageMap});
-        console.log(`[快取] IndexedDB 命中：${pages.length}頁`);
-        if(onDone)onDone();
-        return;
-      }
-      console.log(`[快取] 尺寸不符，重算`);
+      pages=cached.pages;
+      sentencePageMap=cached.sentencePageMap;
+      _pageCache.set(cacheKey,{pages,sentencePageMap});
+      console.log(`[快取] IndexedDB 命中：${pages.length}頁`);
+      if(onDone)onDone();
+      return;
     }
 
     // ── 3. 快取未命中：分批非同步計算 ──
@@ -2476,7 +2468,8 @@ function showPage_num(p,noAnim){
 }
 
 function renderPage(){
-  requestAnimationFrame(()=>{
+  // 等畫面完全穩定（全螢幕動畫、底部 bar 消失等）再計算分頁
+  setTimeout(()=>{
     requestAnimationFrame(()=>{
       buildPages(()=>{
         if(pendingRestorePos){
@@ -2493,7 +2486,7 @@ function renderPage(){
         updateLapBtn();
       });
     });
-  });
+  }, 500);
 }
 
 // ── 分頁重建（保存 startOffset，確保切換方向/字體/旋轉後進度不丟失）──
