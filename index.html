@@ -1133,7 +1133,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.4.5</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.4.6</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1941,11 +1941,11 @@ function showPage(p){
     document.getElementById('reader').classList.add('show');
     document.getElementById('chant-float').classList.add('show');
     document.body.classList.add('reader-fullscreen');
-    // 全螢幕後清快取重算分頁（尺寸改變）
-    if(sentences.length) setTimeout(()=>{clearAllPageCache();_buildingKey=null;rebuildPages();},350);
+    // 全螢幕後尺寸改變，清記憶體快取重算（IDB 保留，新結果會覆寫）
+    if(sentences.length) setTimeout(()=>{clearMemCache();_buildingKey=null;rebuildPages();},350);
   }else{
     document.body.classList.remove('reader-fullscreen');
-    clearAllPageCache();_buildingKey=null;
+    clearMemCache();_buildingKey=null;
     if(p==='stats') document.getElementById('stats-page').style.display='flex';
     else if(p==='calendar') document.getElementById('calendar-page').style.display='flex';
   }
@@ -2305,9 +2305,10 @@ function buildPages(onDone){
   idbGet(cacheKey).then(cached=>{
     if(cached && cached.pages && cached.sentencePageMap){
       // 驗證快取的分頁尺寸是否與現在螢幕接近（容許 20% 差異）
-      const stale = cached.areaW && cached.areaH &&
-        (Math.abs(cached.areaW - areaW) > areaW * 0.2 ||
-         Math.abs(cached.areaH - areaH) > areaH * 0.2);
+      // 沒有 areaW 表示舊格式快取，也視為 stale
+      const stale = !cached.areaW || !cached.areaH ||
+        Math.abs(cached.areaW - areaW) > areaW * 0.2 ||
+        Math.abs(cached.areaH - areaH) > areaH * 0.2;
       if(!stale){
         pages=cached.pages;
         sentencePageMap=cached.sentencePageMap;
