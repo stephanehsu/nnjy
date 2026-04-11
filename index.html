@@ -1092,7 +1092,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.5.6</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.0</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1774,7 +1774,7 @@ function renderLib(){
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
         <button class="lib-item-del" onclick="event.stopPropagation();openGoalModal('${encodeURIComponent(i.title)}')" aria-label="目標" style="color:var(--accent);font-size:13px" title="設定目標遍數">🎯</button>
-        <button class="lib-item-del" onclick="event.stopPropagation();openEditModal('${encodeURIComponent(i.title)}')" aria-label="編輯" style="color:var(--text3);font-size:13px">✎</button>
+
         <button class="lib-item-del" onclick="event.stopPropagation();openDeleteModal('${encodeURIComponent(i.title)}')" aria-label="刪除">✕</button>
       </div>
     </div>`;
@@ -1850,6 +1850,9 @@ function openFromLib(encodedTitle){
   showPage('reader');
   closeLib();
   updateLapDisplay(title);
+  // 檢查音頻包
+  clearAudioMode();
+  checkAndDownloadAudio(title);
   const rosaryMode=localStorage.getItem('nnjy_rosary')||'off';
   showRosary(currentCategory==='佛號短咒'&&rosaryMode!=='off');
   rosaryPos=0;
@@ -1896,6 +1899,7 @@ function showPage(p){
   if(p==='welcome'){
     document.getElementById('welcome').style.display='flex';
     document.body.classList.remove('reader-fullscreen');
+    clearAudioMode();
   }else if(p==='reader'){
     document.getElementById('reader').classList.add('show');
     document.getElementById('chant-float').classList.add('show');
@@ -2003,16 +2007,9 @@ function processText(text){
       pendingDouble=true;
       return;
     }
-    // 先把 **...** 替換成佔位符，防止 * 被當成斷句符號切斷
-    const boldPlaceholders=[];
-    const protected_=l.replace(/\*\*(.*?)\*\*/g,(match,inner)=>{
-      boldPlaceholders.push(inner);
-      return `\u0001${boldPlaceholders.length-1}\u0001`;
-    });
-    const marked=protected_.replace(punctReg,'$1\u0000');
-    const segs=marked.split('\u0000').map(s=>s.trim()).filter(s=>s.length>0)
-      // 還原佔位符為 **...**
-      .map(s=>s.replace(/\u0001(\d+)\u0001/g,(_,i)=>`**${boldPlaceholders[parseInt(i)]}**`));
+    // 斷句
+    const marked=l.replace(punctReg,'$1\u0000');
+    const segs=marked.split('\u0000').map(s=>s.trim()).filter(s=>s.length>0);
     if(!segs.length)return;
     if(pendingDouble && parts.length>0){
       lineBreaks[parts.length-1]=2;
@@ -2255,6 +2252,215 @@ function clearAllPageCache(){
   }).catch(()=>{});
 }
 
+// ══════════════════════════════════════
+// 音頻朗讀系統
+// ══════════════════════════════════════
+const AUDIO_IDB_NAME='nnjy_audio';
+const AUDIO_IDB_VER=1;
+const AUDIO_IDB_STORE='audiofiles';
+const AUDIO_BASE='https://stephanehsu.github.io/nnjy/audio/';
+
+let _audioIdb=null;
+let sutraAudioPlayer=null;   // <audio> element
+let sutraTimeline=null;       // [{idx,start,end}]
+let audioMode=false;          // true = using audio, false = TTS
+let audioPollTimer=null;
+let audioPlaybackRate=1.0;
+
+function openAudioIDB(){
+  if(_audioIdb) return Promise.resolve(_audioIdb);
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(AUDIO_IDB_NAME,AUDIO_IDB_VER);
+    req.onupgradeneeded=e=>{
+      const db=e.target.result;
+      if(!db.objectStoreNames.contains(AUDIO_IDB_STORE)){
+        db.createObjectStore(AUDIO_IDB_STORE,{keyPath:'title'});
+      }
+    };
+    req.onsuccess=e=>{ _audioIdb=e.target.result; res(_audioIdb); };
+    req.onerror=()=>rej(req.error);
+  });
+}
+
+function getAudioData(title){
+  return openAudioIDB().then(db=>new Promise((res)=>{
+    const tx=db.transaction(AUDIO_IDB_STORE,'readonly');
+    const r=tx.objectStore(AUDIO_IDB_STORE).get(title);
+    r.onsuccess=()=>res(r.result||null);
+    r.onerror=()=>res(null);
+  }));
+}
+
+function saveAudioData(title,mp3Blob,timeline){
+  return openAudioIDB().then(db=>new Promise((res,rej)=>{
+    const tx=db.transaction(AUDIO_IDB_STORE,'readwrite');
+    tx.objectStore(AUDIO_IDB_STORE).put({title,mp3:mp3Blob,timeline});
+    tx.oncomplete=()=>res();
+    tx.onerror=()=>rej(tx.error);
+  }));
+}
+
+// 檢查並自動下載音頻包
+async function checkAndDownloadAudio(title){
+  try{
+    // 先檢查 IDB
+    const cached=await getAudioData(title);
+    if(cached && cached.mp3 && cached.timeline){
+      console.log('[Audio] IDB 快取命中：'+title);
+      setupAudioMode(cached.mp3,cached.timeline);
+      return;
+    }
+    // 嘗試從 GitHub Pages 下載
+    const jsonUrl=AUDIO_BASE+encodeURIComponent(title)+'.json';
+    const jsonResp=await fetch(jsonUrl);
+    if(!jsonResp.ok){ console.log('[Audio] 無音頻包：'+title); return; }
+    const timeline=await jsonResp.json();
+    if(!Array.isArray(timeline)||timeline.length===0) return;
+
+    // 下載 mp3
+    showAudioToast('正在下載音頻朗讀包…');
+    const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3';
+    const mp3Resp=await fetch(mp3Url);
+    if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); return; }
+    const mp3Blob=await mp3Resp.blob();
+
+    // 存入 IDB
+    await saveAudioData(title,mp3Blob,timeline);
+    setupAudioMode(mp3Blob,timeline);
+    showAudioToast('音頻朗讀包已就緒');
+  }catch(e){
+    console.log('[Audio] 下載錯誤：',e);
+  }
+}
+
+function setupAudioMode(mp3Blob,timeline){
+  sutraTimeline=timeline;
+  audioMode=true;
+  // 建立或重用 audio element
+  if(!sutraAudioPlayer){
+    sutraAudioPlayer=document.createElement('audio');
+    sutraAudioPlayer.preload='auto';
+    document.body.appendChild(sutraAudioPlayer);
+  }
+  // 釋放舊 URL
+  if(sutraAudioPlayer._blobUrl){
+    URL.revokeObjectURL(sutraAudioPlayer._blobUrl);
+  }
+  const url=URL.createObjectURL(mp3Blob instanceof Blob ? mp3Blob : new Blob([mp3Blob]));
+  sutraAudioPlayer._blobUrl=url;
+  sutraAudioPlayer.src=url;
+  sutraAudioPlayer.playbackRate=audioPlaybackRate;
+  // 更新 TTS 按鈕顯示
+  updateAudioIcon();
+}
+
+function clearAudioMode(){
+  audioMode=false;
+  sutraTimeline=null;
+  if(sutraAudioPlayer){
+    sutraAudioPlayer.pause();
+    if(sutraAudioPlayer._blobUrl){
+      URL.revokeObjectURL(sutraAudioPlayer._blobUrl);
+      sutraAudioPlayer._blobUrl=null;
+    }
+    sutraAudioPlayer.src='';
+  }
+  stopAudioPoll();
+}
+
+function updateAudioIcon(){
+  const btn=document.getElementById('btn-tts');
+  if(!btn)return;
+  if(audioMode){
+    btn.textContent='🎵';
+    btn.title='音頻朗讀模式';
+  }else{
+    btn.textContent=ttsEnabled?'🔊':'🔇';
+    btn.title=ttsEnabled?'語音開':'語音關';
+  }
+  updateSpeedBar(chantSpeed);
+  updateAudioSpeed();
+}
+
+// 音頻播放 polling
+function startAudioPoll(){
+  stopAudioPoll();
+  audioPollTimer=setInterval(()=>{
+    if(!sutraAudioPlayer||sutraAudioPlayer.paused||!sutraTimeline)return;
+    const t=sutraAudioPlayer.currentTime;
+    const idx=sutraTimeline.findIndex(s=>t>=s.start&&t<s.end);
+    if(idx>=0&&idx!==currentIdx){
+      currentIdx=idx;
+      // 計算應該在哪一頁
+      if(sentencePageMap&&sentencePageMap[idx]!==undefined){
+        const targetPage=sentencePageMap[idx];
+        if(targetPage!==currentPage){
+          showPage_num(targetPage,true);
+        }
+      }
+      updateHighlight();
+    }
+  },80);
+}
+
+function stopAudioPoll(){
+  if(audioPollTimer){clearInterval(audioPollTimer);audioPollTimer=null;}
+}
+
+// 音頻播放控制
+function startAudioChant(){
+  if(!sutraAudioPlayer||!sutraTimeline)return;
+  sutraAudioPlayer.playbackRate=audioPlaybackRate;
+  // 如果已經在結尾附近，重頭播放
+  if(sutraAudioPlayer.currentTime>=sutraAudioPlayer.duration-0.5){
+    sutraAudioPlayer.currentTime=0;
+    currentIdx=0;
+    currentPage=-1;
+    showPage_num(0,true);
+  }
+  sutraAudioPlayer.play();
+  startAudioPoll();
+  // 監聽播完事件
+  sutraAudioPlayer.onended=()=>{
+    // 記錄一遍
+    if(currentTitle)recordLap(currentTitle);
+    // 循環
+    sutraAudioPlayer.currentTime=0;
+    currentIdx=0;
+    currentPage=-1;
+    showPage_num(0,true);
+    updateProgress();
+    sutraAudioPlayer.play();
+  };
+}
+
+function stopAudioChant(){
+  if(sutraAudioPlayer){
+    sutraAudioPlayer.pause();
+    sutraAudioPlayer.onended=null;
+  }
+  stopAudioPoll();
+}
+
+// 音頻速度控制（對應速度條 100ms~500ms → playbackRate 1.5~0.5）
+function updateAudioSpeed(){
+  // chantSpeed: 100(快) ~ 500(慢)
+  // playbackRate: 1.5(快) ~ 0.5(慢)
+  audioPlaybackRate=1.5-((chantSpeed-100)/(500-100))*1.0;
+  audioPlaybackRate=Math.max(0.5,Math.min(2.0,audioPlaybackRate));
+  if(sutraAudioPlayer) sutraAudioPlayer.playbackRate=audioPlaybackRate;
+}
+
+function showAudioToast(msg){
+  // 使用現有的 toast 或簡單提示
+  const el=document.createElement('div');
+  el.textContent=msg;
+  el.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(30,16,4,.92);color:#e8c87a;padding:8px 18px;border-radius:20px;font-size:13px;z-index:9999;letter-spacing:.08em;pointer-events:none;opacity:0;transition:opacity .3s';
+  document.body.appendChild(el);
+  requestAnimationFrame(()=>{el.style.opacity='1';});
+  setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),400);},2500);
+}
+
 function buildPages(onDone){
   pages=[];sentencePageMap={};
   if(!sentences.length){ if(onDone)onDone(); return; }
@@ -2399,7 +2605,7 @@ function showPage_num(p,noAnim){
 
       const sp=document.createElement('span');
       sp.className='sentence';
-      sp.innerHTML=segText.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+      sp.textContent=segText;
       sp.dataset.idx=si;
       sp.addEventListener('click',()=>onSentenceClick(si));
       if(si===currentIdx) sp.classList.add('active');
@@ -2592,7 +2798,10 @@ function startChant(){
   ball.classList.add('playing');
   ball.textContent='⏹';
   updateHighlight();
-  if(chantMode==='auto'){
+  if(audioMode && sutraAudioPlayer && sutraTimeline){
+    // 音頻朗讀模式
+    startAudioChant();
+  }else if(chantMode==='auto'){
     if(ttsEnabled){
       // TTS 模式：第一句念完後才啟動 RAF
       nextFireAt=Infinity;
@@ -2619,6 +2828,7 @@ function stopChant(){
   ball.classList.remove('playing');
   ball.textContent='誦';
   if(window.speechSynthesis)speechSynthesis.cancel();
+  stopAudioChant();
 }
 
 function speak(text, onDone){
@@ -2645,7 +2855,16 @@ function updateSpeedBar(ms){
   const pct=Math.max(0,Math.min(100,speedToPct(ms)));
   document.getElementById('float-speed-fill').style.width=pct+'%';
   document.getElementById('float-speed-thumb').style.left=pct+'%';
-  document.getElementById('float-speed-num').textContent=(ms/1000).toFixed(2).replace(/\.?0+$/,'');
+  const numEl=document.getElementById('float-speed-num');
+  const curEl=document.getElementById('float-speed-cur');
+  if(audioMode){
+    const rate=1.5-((ms-100)/(500-100))*1.0;
+    numEl.textContent=Math.max(0.5,Math.min(2.0,rate)).toFixed(1);
+    curEl.innerHTML='播放速度 <b id="float-speed-num">'+numEl.textContent+'</b>x';
+  }else{
+    numEl.textContent=(ms/1000).toFixed(2).replace(/\.?0+$/,'');
+    curEl.innerHTML='每字 <b id="float-speed-num">'+numEl.textContent+'</b> 秒';
+  }
 }
 function handleSpeedDrag(clientX){
   const track=document.getElementById('float-speed-track');
@@ -2653,11 +2872,23 @@ function handleSpeedDrag(clientX){
   const pct=Math.max(0,Math.min(100,((clientX-rect.left)/rect.width)*100));
   chantSpeed=pctToSpeed(pct);
   updateSpeedBar(chantSpeed);
+  updateAudioSpeed();
   if(isPlaying&&rafId)nextFireAt=performance.now()+calcDelay();
 }
 
 // ── 點句 ──
 function onSentenceClick(idx){
+  if(audioMode && sutraAudioPlayer && sutraTimeline){
+    // 音頻模式：跳到該句時間點
+    const seg=sutraTimeline.find(s=>s.idx===idx);
+    if(seg){
+      currentIdx=idx;
+      updateHighlight();
+      sutraAudioPlayer.currentTime=seg.start;
+      if(!isPlaying){startChant();}
+    }
+    return;
+  }
   if(!chantActive||isPlaying)return;
   currentIdx=idx;updateHighlight();
   if(ttsEnabled)speak(sentences[idx]);
@@ -2781,6 +3012,7 @@ function setCustomSpeed(v){
   if(isPlaying&&chantMode==='auto')scheduleNext();
 }
 function toggleTTS(){
+  if(audioMode) return; // 音頻模式下不切換 TTS
   ttsEnabled=!ttsEnabled;
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
   document.getElementById('btn-tts').textContent=ttsEnabled?'🔊':'🔇';
@@ -3624,6 +3856,7 @@ document.getElementById('btn-play').addEventListener('click',function(e){
 // ── 語音按鈕 ──
 document.getElementById('btn-tts').addEventListener('click',function(e){
   e.stopPropagation();
+  if(audioMode) return; // 音頻模式下不切換
   ttsEnabled=!ttsEnabled;
   this.textContent=ttsEnabled?'🔊':'🔇';
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
