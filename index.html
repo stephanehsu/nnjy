@@ -1095,7 +1095,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.6</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.7</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2448,6 +2448,9 @@ function startAudioChant(){
     currentIdx=0;
     currentPage=-1;
     showPage_num(0,true);
+  }else{
+    // 同步音頻到目前高亮的句子（翻頁後 currentIdx 可能已改變）
+    syncAudioToCurrentIdx();
   }
   const p=sutraAudioPlayer.play();
   if(p&&p.catch) p.catch(e=>console.log('[Audio] play error:',e));
