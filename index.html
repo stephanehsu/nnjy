@@ -544,7 +544,7 @@ body.reader-fullscreen #book-left{
 /* 圓形觸發按鈕 — 永遠可見 */
 #chant-ball{
   order:2;
-  width:44px;height:44px;border-radius:50%;
+  width:48px;height:48px;border-radius:50%;
   background:var(--bg2);
   border:1px solid var(--border);
   box-shadow:0 2px 10px rgba(0,0,0,.35);
@@ -570,8 +570,8 @@ body.reader-fullscreen #book-left{
   border:1px solid var(--border);
   border-right:none;
   border-radius:20px 0 0 20px;
-  overflow:hidden;
-  width:0;height:44px;
+  overflow:visible;
+  width:0;height:48px;
   opacity:0;
   pointer-events:none;
   display:flex;flex-direction:row;align-items:center;gap:0;
@@ -3034,7 +3034,11 @@ function setCustomSpeed(v){
   if(isPlaying&&chantMode==='auto')scheduleNext();
 }
 function toggleTTS(){
-  if(audioMode) return; // 音頻模式下不切換 TTS
+  if(audioMode && sutraAudioPlayer){
+    sutraAudioPlayer.muted=!sutraAudioPlayer.muted;
+    document.getElementById('btn-tts').textContent=sutraAudioPlayer.muted?'🔇':'🎵';
+    return;
+  }
   ttsEnabled=!ttsEnabled;
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
   document.getElementById('btn-tts').textContent=ttsEnabled?'🔊':'🔇';
@@ -3888,7 +3892,13 @@ document.getElementById('btn-play').addEventListener('click',function(e){
 // ── 語音按鈕 ──
 document.getElementById('btn-tts').addEventListener('click',function(e){
   e.stopPropagation();
-  if(audioMode) return; // 音頻模式下不切換
+  if(audioMode && sutraAudioPlayer){
+    // 音頻模式：切換靜音（高亮繼續走）
+    sutraAudioPlayer.muted=!sutraAudioPlayer.muted;
+    this.textContent=sutraAudioPlayer.muted?'🔇':'🎵';
+    return;
+  }
+  // TTS 模式
   ttsEnabled=!ttsEnabled;
   this.textContent=ttsEnabled?'🔊':'🔇';
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
