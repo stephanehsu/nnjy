@@ -1095,7 +1095,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.7</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.8</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -4012,18 +4012,18 @@ document.getElementById('btn-manual-lap').addEventListener('click',function(e){
 });
 document.getElementById('page-prev-zone').addEventListener('click',function(e){
   e.stopPropagation();
-  if(!isPlaying){
+  if(!isPlaying || audioMode){
     const isVert=document.getElementById('text-container').style.writingMode!=='horizontal-tb';
-    if(isVert) goNextPage(); // 直排：左側 = 下一頁
-    else goPrevPage();       // 橫排：左側 = 上一頁
+    if(isVert) goNextPage();
+    else goPrevPage();
   }
 });
 document.getElementById('page-next-zone').addEventListener('click',function(e){
   e.stopPropagation();
-  if(!isPlaying){
+  if(!isPlaying || audioMode){
     const isVert=document.getElementById('text-container').style.writingMode!=='horizontal-tb';
-    if(isVert) goPrevPage(); // 直排：右側 = 上一頁
-    else goNextPage();       // 橫排：右側 = 下一頁
+    if(isVert) goPrevPage();
+    else goNextPage();
   }
 });
 
@@ -4037,13 +4037,12 @@ document.getElementById('reading-area').addEventListener('touchend',function(e){
   const dy=e.changedTouches[0].clientY-touchStartY;
   const isVert=document.getElementById('text-container').style.writingMode!=='horizontal-tb';
   if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>40){
-    if(!isPlaying){
+    if(!isPlaying || (audioMode && isPlaying)){
+      // 未播放 或 音頻播放中 都可以翻頁
       if(isVert){
-        // 直排：右滑=下一頁，左滑=上一頁（符合從右往左的閱讀方向）
         if(dx>0)goNextPage();
         else goPrevPage();
       }else{
-        // 橫排：左滑=下一頁，右滑=上一頁
         if(dx<0)goNextPage();
         else goPrevPage();
       }
