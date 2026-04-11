@@ -1,0 +1,98 @@
+<!doctype html>
+<html translate="no" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="提供臺灣口音超擬真 AI 聲優，富有情緒、生動流暢的 AI，帶你輕鬆實現創意。虛擬人、虛擬分身、AI Podcast、文字轉語音、API。">
+    <meta name="keywords" content="AI, 聲音生成, 台灣, 特色語音">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta property="og:title" content="臺灣口音 AI 語音、一鍵生成虛擬人影片和 AI Podcast｜VoAI 聲音創造所">
+    <meta property="og:description" content="提供臺灣口音超擬真 AI 聲優，富有情緒、生動流暢的 AI，帶你輕鬆實現創意。虛擬人、虛擬分身、AI Podcast、文字轉語音、API。">
+    <meta property="og:image" content="https://app.voai.ai/images/logos/VoAI-share.jpg">
+    <meta property="og:type" content="website">
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="/images/logos/voai-logo.png"
+    />
+    <title>VoAI 聲音創造所</title>
+    <!-- Google Tag Manager -->
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+      new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+      j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+      'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+      })(window,document,'script','dataLayer','GTM-5K3NQQN6');
+    </script> 
+    <!-- End Google Tag Manager -->
+     
+    <!-- <script type="text/javascript">
+      (function(c,l,a,r,i,t,y){
+          c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+          t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+          y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+      })(window, document, "clarity", "script", "p5fexk6o9k");
+    </script> -->
+    <style>
+      .myBox {
+        height: 27rem;
+      }
+      @media (max-width: 768px) {
+        .myBox {
+          height: 20rem;
+        }
+      }
+      @media (max-width: 480px) {
+        .myBox {
+          height: 16rem;
+        }
+      }
+      .welcomeTitle {
+        font-size: 48px; 
+        font-weight: 700; 
+        color: #635648; 
+        font-family: Noto Sans TC;
+        margin-top: 8px;
+      }
+      @media (max-width: 480px) {
+        .welcomeTitle {
+          font-size: 24px; 
+        }
+      }
+      .welcomeText {
+        font-size: 24px; 
+        font-weight: 700; 
+        color: #635648; 
+        font-family: Noto Sans TC;
+        margin-top: 8px;
+      }
+      @media (max-width: 480px) {
+        .welcomeText {
+          font-size: 16px; 
+        }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-WYG5xPMB.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/lottie-BXLB-XWf.js">
+    <link rel="modulepreload" crossorigin href="/assets/recharts-DiwIRfJ7.js">
+    <link rel="stylesheet" crossorigin href="/assets/index-DDS1u0iq.css">
+  </head>
+  <body>
+    <noscript>
+      <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5K3NQQN6"
+        height="0" width="0" style="display:none;visibility:hidden">
+      </iframe>
+    </noscript>
+    <div id="loading">
+      <div style="display:flex; flex-direction: column; justify-content: center; align-items: center; height: 95vh;">
+        <img
+          src="/images/logos/Loading.gif"
+          alt="description"
+          class="myBox"
+        />
+        <div class="welcomeTitle">絕好聲創 - VoAI 聲音創造所</div>
+        <div class="welcomeText">畫面努力催生中，請稍候...</div>
+      </div>
+    </div>
+    <div id="root"></div>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"c64b8d288f564aa1ba5997c7243a4a1c","r":1,"server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+</body>
+</html>
