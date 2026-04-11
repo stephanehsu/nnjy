@@ -2322,11 +2322,11 @@ async function checkAndDownloadAudio(title){
     const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3';
     const mp3Resp=await fetch(mp3Url);
     if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); return; }
-    const mp3Blob=await mp3Resp.blob();
+    const mp3ArrayBuffer=await mp3Resp.arrayBuffer();
 
-    // 存入 IDB
-    await saveAudioData(title,mp3Blob,timeline);
-    setupAudioMode(mp3Blob,timeline);
+    // 存入 IDB（存 ArrayBuffer 相容性最好）
+    await saveAudioData(title,mp3ArrayBuffer,timeline);
+    setupAudioMode(mp3ArrayBuffer,timeline);
     showAudioToast('音頻朗讀包已就緒');
   }catch(e){
     console.log('[Audio] 下載錯誤：',e);
@@ -2335,7 +2335,6 @@ async function checkAndDownloadAudio(title){
 
 function setupAudioMode(mp3Blob,timeline){
   sutraTimeline=timeline;
-  audioMode=true;
   // 建立或重用 audio element
   if(!sutraAudioPlayer){
     sutraAudioPlayer=document.createElement('audio');
@@ -2346,12 +2345,30 @@ function setupAudioMode(mp3Blob,timeline){
   if(sutraAudioPlayer._blobUrl){
     URL.revokeObjectURL(sutraAudioPlayer._blobUrl);
   }
-  const url=URL.createObjectURL(mp3Blob instanceof Blob ? mp3Blob : new Blob([mp3Blob]));
+  // 確保轉成 Blob 且有正確的 MIME type
+  let blob;
+  if(mp3Blob instanceof Blob){
+    blob = mp3Blob.type ? mp3Blob : new Blob([mp3Blob],{type:'audio/mpeg'});
+  }else if(mp3Blob instanceof ArrayBuffer){
+    blob = new Blob([mp3Blob],{type:'audio/mpeg'});
+  }else{
+    blob = new Blob([mp3Blob],{type:'audio/mpeg'});
+  }
+  const url=URL.createObjectURL(blob);
   sutraAudioPlayer._blobUrl=url;
   sutraAudioPlayer.src=url;
   sutraAudioPlayer.playbackRate=audioPlaybackRate;
-  // 更新 TTS 按鈕顯示
-  updateAudioIcon();
+  // 等音頻可以播放後才啟用 audioMode
+  sutraAudioPlayer.oncanplay=()=>{
+    audioMode=true;
+    updateAudioIcon();
+    console.log('[Audio] 音頻已就緒，可播放');
+  };
+  sutraAudioPlayer.onerror=(e)=>{
+    console.log('[Audio] 音頻載入失敗：',e);
+    audioMode=false;
+    updateAudioIcon();
+  };
 }
 
 function clearAudioMode(){
@@ -2418,7 +2435,8 @@ function startAudioChant(){
     currentPage=-1;
     showPage_num(0,true);
   }
-  sutraAudioPlayer.play();
+  const p=sutraAudioPlayer.play();
+  if(p&&p.catch) p.catch(e=>console.log('[Audio] play error:',e));
   startAudioPoll();
   // 監聽播完事件
   sutraAudioPlayer.onended=()=>{
@@ -2430,7 +2448,8 @@ function startAudioChant(){
     currentPage=-1;
     showPage_num(0,true);
     updateProgress();
-    sutraAudioPlayer.play();
+    const p2=sutraAudioPlayer.play();
+    if(p2&&p2.catch) p2.catch(e=>console.log('[Audio] loop play error:',e));
   };
 }
 
