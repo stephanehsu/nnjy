@@ -1095,7 +1095,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.4</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.5</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2311,6 +2311,7 @@ async function checkAndDownloadAudio(title){
     const cached=await getAudioData(title);
     if(cached && cached.mp3 && cached.timeline){
       console.log('[Audio] IDB 快取命中：'+title);
+      showAudioLoading('載入音頻中…');
       setupAudioMode(cached.mp3,cached.timeline);
       return;
     }
@@ -2322,10 +2323,10 @@ async function checkAndDownloadAudio(title){
     if(!Array.isArray(timeline)||timeline.length===0) return;
 
     // 下載 mp3
-    showAudioToast('正在下載音頻朗讀包…');
+    showAudioLoading('正在下載音頻朗讀包…');
     const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3';
     const mp3Resp=await fetch(mp3Url);
-    if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); return; }
+    if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); hideAudioLoading(); return; }
     const mp3ArrayBuffer=await mp3Resp.arrayBuffer();
 
     // 存入 IDB（存 ArrayBuffer 相容性最好）
@@ -2334,6 +2335,7 @@ async function checkAndDownloadAudio(title){
     showAudioToast('音頻朗讀包已就緒');
   }catch(e){
     console.log('[Audio] 下載錯誤：',e);
+    hideAudioLoading();
   }
 }
 
@@ -2345,6 +2347,10 @@ function setupAudioMode(mp3Blob,timeline){
     sutraAudioPlayer.preload='auto';
     document.body.appendChild(sutraAudioPlayer);
   }
+  // 先清除舊的事件監聽，避免殘留回呼
+  sutraAudioPlayer.oncanplay=null;
+  sutraAudioPlayer.onerror=null;
+  sutraAudioPlayer.onended=null;
   // 釋放舊 URL
   if(sutraAudioPlayer._blobUrl){
     URL.revokeObjectURL(sutraAudioPlayer._blobUrl);
@@ -2364,14 +2370,18 @@ function setupAudioMode(mp3Blob,timeline){
   sutraAudioPlayer.playbackRate=audioPlaybackRate;
   // 等音頻可以播放後才啟用 audioMode
   sutraAudioPlayer.oncanplay=()=>{
+    sutraAudioPlayer.oncanplay=null; // 只觸發一次
     audioMode=true;
     updateAudioIcon();
+    hideAudioLoading();
     console.log('[Audio] 音頻已就緒，可播放');
   };
   sutraAudioPlayer.onerror=(e)=>{
+    sutraAudioPlayer.onerror=null;
     console.log('[Audio] 音頻載入失敗：',e);
     audioMode=false;
     updateAudioIcon();
+    hideAudioLoading();
   };
 }
 
@@ -2475,13 +2485,31 @@ function updateAudioSpeed(){
 }
 
 function showAudioToast(msg){
-  // 使用現有的 toast 或簡單提示
   const el=document.createElement('div');
   el.textContent=msg;
   el.style.cssText='position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:rgba(30,16,4,.92);color:#e8c87a;padding:8px 18px;border-radius:20px;font-size:13px;z-index:9999;letter-spacing:.08em;pointer-events:none;opacity:0;transition:opacity .3s';
   document.body.appendChild(el);
   requestAnimationFrame(()=>{el.style.opacity='1';});
   setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),400);},2500);
+}
+
+function showAudioLoading(msg){
+  let overlay=document.getElementById('audio-loading-overlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='audio-loading-overlay';
+    overlay.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(26,20,16,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;writing-mode:horizontal-tb';
+    overlay.innerHTML='<div style="width:32px;height:32px;border:3px solid rgba(201,168,76,.3);border-top-color:#c9a84c;border-radius:50%;animation:spin .7s linear infinite"></div><div id="audio-loading-msg" style="color:#e8c87a;font-size:14px;letter-spacing:.1em;font-family:var(--font-main)"></div>';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display='flex';
+  const msgEl=document.getElementById('audio-loading-msg');
+  if(msgEl) msgEl.textContent=msg||'載入中…';
+}
+
+function hideAudioLoading(){
+  const overlay=document.getElementById('audio-loading-overlay');
+  if(overlay) overlay.style.display='none';
 }
 
 function buildPages(onDone){
