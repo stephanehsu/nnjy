@@ -1095,7 +1095,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.5</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.6</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2838,6 +2838,7 @@ function startRAF(){
 function scheduleNext(){
   if(rafId){cancelAnimationFrame(rafId);rafId=null;}
   if(!isPlaying||chantMode!=='auto')return;
+  if(audioMode) return; // 音頻模式下高亮由 polling 控制，不用 RAF
   startRAF();
 }
 
@@ -3952,7 +3953,6 @@ function updateLapBtn(){
 function goNextPage(){
   if(currentPage<pages.length-1){
     const nextP=currentPage+1;
-    // 先更新 currentIdx，showPage_num 裡的 saveReadPos 才能存到正確位置
     const pg=pages[nextP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
     showPage_num(nextP);
@@ -3962,6 +3962,7 @@ function goNextPage(){
     showPage_num(0);
     updateProgress();
   }
+  syncAudioToCurrentIdx();
   updateLapBtn();
 }
 function goPrevPage(){
@@ -3972,7 +3973,15 @@ function goPrevPage(){
     showPage_num(prevP);
     updateProgress();
   }
+  syncAudioToCurrentIdx();
   updateLapBtn();
+}
+
+// 翻頁後同步音頻位置到當前句子
+function syncAudioToCurrentIdx(){
+  if(!audioMode||!sutraAudioPlayer||!sutraTimeline)return;
+  const seg=sutraTimeline.find(s=>s.idx===currentIdx);
+  if(seg) sutraAudioPlayer.currentTime=seg.start;
 }
 // 根據字元偏移量找對應的句子索引
 function sentencePageMap2sentIdx(offset){
