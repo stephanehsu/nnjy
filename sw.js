@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nnjy-v1.0.3.6b';
+const CACHE_NAME = 'nnjy-v1.0.6.3';
 
 // 本地靜態資源
 const STATIC_ASSETS = [
@@ -20,7 +20,7 @@ self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(STATIC_ASSETS))
-      .then(() => self.skipWaiting()) // 立即接管，不等舊 SW 結束
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -33,7 +33,7 @@ self.addEventListener('activate', e => {
           .filter(key => key !== CACHE_NAME)
           .map(key => caches.delete(key))
       )
-    ).then(() => self.clients.claim()) // 立即控制所有分頁
+    ).then(() => self.clients.claim())
   );
 });
 
@@ -41,7 +41,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // Firebase / Firestore / Google Auth → 不快取，直接走網路
+  // Firebase / Firestore / Google Auth → 不快取
   if (
     url.hostname.includes('firebase') ||
     url.hostname.includes('firestore') ||
@@ -54,7 +54,13 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // Google Fonts → Stale-While-Revalidate（優先快取，背景更新）
+  // 音頻檔案（mp3/json in audio/）→ 不快取，直接走網路（IDB 自己管）
+  if (url.pathname.includes('/audio/')) {
+    e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
+    return;
+  }
+
+  // Google Fonts → Stale-While-Revalidate
   if (FONT_HOSTS.includes(url.hostname)) {
     e.respondWith(
       caches.open(CACHE_NAME).then(cache =>
@@ -70,18 +76,20 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // GitHub Pages 靜態資源（index.html、icon 等）→ Cache First
+  // 只處理 http/https
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  // 靜態資源 → Network First（優先拿最新版，失敗才用快取）
   e.respondWith(
-    caches.match(e.request).then(cached => {
-      if (cached) return cached;
-      return fetch(e.request).then(response => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-        }
-        return response;
-      }).catch(() => {
-        // 離線且無快取時，回傳首頁（讓 app 能開啟）
+    fetch(e.request).then(response => {
+      if (response.ok && url.protocol === 'https:') {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+      }
+      return response;
+    }).catch(() => {
+      return caches.match(e.request).then(cached => {
+        if (cached) return cached;
         if (e.request.mode === 'navigate') {
           return caches.match('./index.html');
         }
