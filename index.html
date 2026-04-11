@@ -596,8 +596,11 @@ body.reader-fullscreen #book-left{
 .c-btn:active{color:var(--accent)}
 @media(hover:hover){.c-btn:hover{color:var(--accent)}}
 .c-btn.play{
-  width:30px;height:30px;font-size:14px;
+  width:46px;height:46px;font-size:22px;
   color:var(--accent);
+  background:rgba(37,30,23,.65);
+  border:1px solid rgba(201,168,76,.3);
+  backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
 }
 .c-btn.play:active{opacity:.7}
 
@@ -2417,7 +2420,7 @@ function startAudioPoll(){
       }
       updateHighlight();
     }
-  },80);
+  },50);
 }
 
 function stopAudioPoll(){
@@ -3815,6 +3818,7 @@ document.getElementById('btn-calendar').addEventListener('click',()=>{showCalend
       ball.classList.remove('playing');
       ball.textContent='誦';
       if(window.speechSynthesis) speechSynthesis.cancel();
+      stopAudioChant();
     } else {
       // 若停在最後一句，先跳回開頭
       if(currentIdx>=sentences.length-1){
@@ -3827,8 +3831,12 @@ document.getElementById('btn-calendar').addEventListener('click',()=>{showCalend
       document.getElementById('btn-play').textContent='⏸';
       ball.classList.add('playing');
       ball.textContent='⏹';
-      if(ttsEnabled) speak(sentences[currentIdx]);
-      if(chantMode==='auto') startRAF();
+      if(audioMode && sutraAudioPlayer && sutraTimeline){
+        startAudioChant();
+      }else{
+        if(ttsEnabled) speak(sentences[currentIdx]);
+        if(chantMode==='auto') startRAF();
+      }
     }
   });
 
@@ -3856,6 +3864,7 @@ document.getElementById('btn-play').addEventListener('click',function(e){
     document.getElementById('chant-ball').classList.remove('playing');
     document.getElementById('chant-ball').textContent='誦';
     if(window.speechSynthesis)speechSynthesis.cancel();
+    stopAudioChant();
   }else{
     // 若停在最後一句（念完狀態），先跳回開頭再繼續，避免立刻觸發 recordLap
     if(currentIdx>=sentences.length-1){
@@ -3867,8 +3876,12 @@ document.getElementById('btn-play').addEventListener('click',function(e){
     isPlaying=true;this.textContent='⏸';
     document.getElementById('chant-ball').classList.add('playing');
     document.getElementById('chant-ball').textContent='⏹';
-    if(ttsEnabled)speak(sentences[currentIdx]);
-    if(chantMode==='auto')startRAF();
+    if(audioMode && sutraAudioPlayer && sutraTimeline){
+      startAudioChant();
+    }else{
+      if(ttsEnabled)speak(sentences[currentIdx]);
+      if(chantMode==='auto')startRAF();
+    }
   }
 });
 
