@@ -604,42 +604,23 @@ body.reader-fullscreen #book-left{
 }
 .c-btn.play:active{opacity:.7}
 
-/* 速度條 */
+/* 速度分段按鈕 */
 #float-speed-wrap{
   flex:1;min-width:0;
   user-select:none;-webkit-user-select:none;
   display:flex;flex-direction:column;gap:2px;
 }
-#float-speed-track{
-  position:relative;height:3px;background:var(--bg3);
-  border-radius:2px;cursor:pointer;flex-shrink:0;
+.spd-seg{
+  flex:1;padding:3px 0;border:none;border-radius:3px;
+  background:transparent;color:var(--text3);
+  font-size:10px;font-family:inherit;cursor:pointer;
+  transition:all .15s;letter-spacing:.02em;
 }
-#float-speed-fill{
-  position:absolute;left:0;top:0;height:100%;
-  background:var(--accent);border-radius:2px;
-  pointer-events:none;
+.spd-seg.active{
+  background:var(--accent);color:#f5edd8;
+  font-weight:700;
 }
-#float-speed-thumb{
-  position:absolute;top:50%;width:10px;height:10px;
-  border-radius:50%;background:var(--accent);
-  transform:translate(-50%,-50%);
-  pointer-events:none;
-}
-.spd-dot{
-  position:absolute;top:50%;width:4px;height:4px;
-  border-radius:50%;background:var(--bg2);
-  transform:translate(-50%,-50%);pointer-events:none;
-}
-#float-speed-labels{
-  display:flex;justify-content:space-between;
-}
-/* 快慢標籤與秒速同色 */
-#float-speed-labels span{font-size:9px;color:#c8a870}
-#float-speed-cur{
-  font-size:9px;color:#c8a870;text-align:center;
-  letter-spacing:.02em;line-height:1;white-space:nowrap;overflow:hidden;
-}
-#float-speed-cur b{color:#e8c87a;font-weight:500}
+.spd-seg:active{opacity:.7}
 #settings-panel{
   position:fixed;top:0;
   right:calc(-1 * min(380px,95vw));
@@ -761,28 +742,6 @@ body.reader-fullscreen #book-left{
 #settings-panel::-webkit-scrollbar{width:3px}
 #settings-panel::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
-/* 速度條 YT 風格 — 緊湊版 */
-#float-speed-wrap{padding:0;user-select:none;-webkit-user-select:none}
-#float-speed-track{
-  position:relative;height:4px;background:var(--bg3);
-  border-radius:2px;margin:4px 0 0;cursor:pointer;
-}
-#float-speed-fill{
-  position:absolute;left:0;top:0;height:100%;
-  background:var(--accent);border-radius:2px;
-  pointer-events:none;transition:width .1s;
-}
-#float-speed-thumb{
-  position:absolute;top:50%;width:12px;height:12px;
-  border-radius:50%;background:var(--accent);
-  transform:translate(-50%,-50%);
-  pointer-events:none;transition:left .1s;
-}
-.spd-dot{
-  position:absolute;top:50%;width:5px;height:5px;
-  border-radius:50%;background:var(--bg2);
-  transform:translate(-50%,-50%);pointer-events:none;
-}
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn .45s ease forwards}
 
@@ -1095,7 +1054,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.8</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.9</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1189,25 +1148,23 @@ body.reader-fullscreen #book-left{
       <div class="chant-controls">
         <button class="c-btn play" id="btn-play" aria-label="播放"
           style="width:46px;height:46px;font-size:22px;background:rgba(37,30,23,.6);border:1px solid rgba(201,168,76,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">▶</button>
-        <button class="c-btn" id="btn-tts" aria-label="語音">🔇</button>
       </div>
       <div id="float-speed-wrap">
-        <div id="float-speed-labels">
-          <span>快</span><span>慢</span>
+        <div id="float-speed-btns" style="display:flex;gap:3px;align-items:center">
+          <button class="spd-seg" data-speed="100" onclick="setSegSpeed(100,this)">2x</button>
+          <button class="spd-seg" data-speed="200" onclick="setSegSpeed(200,this)">1.5x</button>
+          <button class="spd-seg active" data-speed="300" onclick="setSegSpeed(300,this)">1x</button>
+          <button class="spd-seg" data-speed="400" onclick="setSegSpeed(400,this)">0.7x</button>
+          <button class="spd-seg" data-speed="500" onclick="setSegSpeed(500,this)">0.5x</button>
         </div>
-        <div id="float-speed-track">
-          <div id="float-speed-fill"></div>
-          <div id="float-speed-thumb"></div>
-          <div class="spd-dot" style="left:0%"></div>
-          <div class="spd-dot" style="left:25%"></div>
-          <div class="spd-dot" style="left:50%"></div>
-          <div class="spd-dot" style="left:75%"></div>
-          <div class="spd-dot" style="left:100%"></div>
-        </div>
-        <div id="float-speed-cur">每字 <b id="float-speed-num">0.4</b> 秒</div>
       </div>
     </div>
     <div id="chant-ball" aria-label="念誦控制">誦</div>
+  </div>
+  <!-- 語音/音頻按鈕（獨立在誦球下方）-->
+  <div style="display:flex;justify-content:flex-end;padding-right:12px;margin-top:4px">
+    <button class="c-btn" id="btn-tts" aria-label="語音"
+      style="width:40px;height:40px;font-size:18px;background:rgba(37,30,23,.5);border:1px solid rgba(201,168,76,.25);border-radius:50%">🔇</button>
   </div>
 </div>
 
@@ -2409,7 +2366,6 @@ function updateAudioIcon(){
     btn.textContent=ttsEnabled?'🔊':'🔇';
     btn.title=ttsEnabled?'語音開':'語音關';
   }
-  updateSpeedBar(chantSpeed);
   updateAudioSpeed();
 }
 
@@ -2418,11 +2374,11 @@ function startAudioPoll(){
   stopAudioPoll();
   audioPollTimer=setInterval(()=>{
     if(!sutraAudioPlayer||sutraAudioPlayer.paused||!sutraTimeline)return;
+    if(Date.now()<_syncLock)return;
     const t=sutraAudioPlayer.currentTime;
     const idx=sutraTimeline.findIndex(s=>t>=s.start&&t<s.end);
     if(idx>=0&&idx!==currentIdx){
       currentIdx=idx;
-      // 計算應該在哪一頁
       if(sentencePageMap&&sentencePageMap[idx]!==undefined){
         const targetPage=sentencePageMap[idx];
         if(targetPage!==currentPage){
@@ -2437,6 +2393,14 @@ function startAudioPoll(){
 function stopAudioPoll(){
   if(audioPollTimer){clearInterval(audioPollTimer);audioPollTimer=null;}
 }
+
+// 防止瀏覽器背景凍結 polling — 回到前景時重啟
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden && isPlaying && audioMode && sutraAudioPlayer && !sutraAudioPlayer.paused){
+    stopAudioPoll();
+    startAudioPoll();
+  }
+});
 
 // 音頻播放控制
 function startAudioChant(){
@@ -2896,7 +2860,7 @@ function speak(text, onDone){
   speechSynthesis.speak(u);
 }
 
-// ── 速度條 ──
+// ── 速度分段 ──
 function calcDelay(){
   const s=stripBold(sentences[currentIdx]||'');
   const endsWithPunct=/[。！？；～.．…，、：—」』】）\]]+$/.test(s);
@@ -2904,29 +2868,11 @@ function calcDelay(){
   const n=Math.max(1,s.replace(/[^\u4e00-\u9fff\u3400-\u4dbfa-zA-Z0-9]/g,'').length);
   return n*chantSpeed;
 }
-function speedToPct(ms){return((ms-100)/(500-100))*100}
-function pctToSpeed(pct){return Math.round(100+pct*(500-100)/100)}
-function updateSpeedBar(ms){
-  const pct=Math.max(0,Math.min(100,speedToPct(ms)));
-  document.getElementById('float-speed-fill').style.width=pct+'%';
-  document.getElementById('float-speed-thumb').style.left=pct+'%';
-  const numEl=document.getElementById('float-speed-num');
-  const curEl=document.getElementById('float-speed-cur');
-  if(audioMode){
-    const rate=1.5-((ms-100)/(500-100))*1.0;
-    numEl.textContent=Math.max(0.5,Math.min(2.0,rate)).toFixed(1);
-    curEl.innerHTML='播放速度 <b id="float-speed-num">'+numEl.textContent+'</b>x';
-  }else{
-    numEl.textContent=(ms/1000).toFixed(2).replace(/\.?0+$/,'');
-    curEl.innerHTML='每字 <b id="float-speed-num">'+numEl.textContent+'</b> 秒';
-  }
-}
-function handleSpeedDrag(clientX){
-  const track=document.getElementById('float-speed-track');
-  const rect=track.getBoundingClientRect();
-  const pct=Math.max(0,Math.min(100,((clientX-rect.left)/rect.width)*100));
-  chantSpeed=pctToSpeed(pct);
-  updateSpeedBar(chantSpeed);
+
+function setSegSpeed(ms, el){
+  chantSpeed=ms;
+  document.querySelectorAll('.spd-seg').forEach(b=>b.classList.remove('active'));
+  if(el) el.classList.add('active');
   updateAudioSpeed();
   if(isPlaying&&rafId)nextFireAt=performance.now()+calcDelay();
 }
@@ -3981,10 +3927,15 @@ function goPrevPage(){
 }
 
 // 翻頁後同步音頻位置到當前句子
+let _syncLock=0; // 防止 polling 馬上覆蓋 sync 結果
 function syncAudioToCurrentIdx(){
   if(!audioMode||!sutraAudioPlayer||!sutraTimeline)return;
   const seg=sutraTimeline.find(s=>s.idx===currentIdx);
-  if(seg) sutraAudioPlayer.currentTime=seg.start;
+  if(seg){
+    // 加 0.05 秒偏移，確保落在目標句子範圍內而非邊界
+    sutraAudioPlayer.currentTime=seg.start+0.05;
+    _syncLock=Date.now()+300; // 300ms 內 polling 不覆蓋 currentIdx
+  }
 }
 // 根據字元偏移量找對應的句子索引
 function sentencePageMap2sentIdx(offset){
@@ -4053,18 +4004,6 @@ document.getElementById('reading-area').addEventListener('touchend',function(e){
   }
 },{passive:true});
 
-// ── 速度條 ──
-const track=document.getElementById('float-speed-track');
-track.addEventListener('click',function(e){e.stopPropagation();handleSpeedDrag(e.clientX)});
-track.addEventListener('mousedown',function(e){
-  e.stopPropagation();handleSpeedDrag(e.clientX);
-  const mv=ev=>{ev.preventDefault();handleSpeedDrag(ev.clientX)};
-  const up=()=>{document.removeEventListener('mousemove',mv);document.removeEventListener('mouseup',up)};
-  document.addEventListener('mousemove',mv);document.addEventListener('mouseup',up);
-});
-track.addEventListener('touchstart',function(e){e.stopPropagation();handleSpeedDrag(e.touches[0].clientX)},{passive:true});
-track.addEventListener('touchmove',function(e){e.stopPropagation();handleSpeedDrag(e.touches[0].clientX);e.preventDefault();},{passive:false});
-
 // ── 書庫滑出感應 ──
 document.getElementById('lib-swipe-zone').addEventListener('touchstart',e=>{
   const startX=e.touches[0].clientX;
@@ -4075,7 +4014,6 @@ document.getElementById('lib-swipe-zone').addEventListener('touchstart',e=>{
   document.addEventListener('touchend',end,{passive:true});
 },{passive:true});
 
-updateSpeedBar(chantSpeed);
 // 若已安裝為 PWA，隱藏安裝按鈕
 if(window.matchMedia('(display-mode: standalone)').matches||
    window.navigator.standalone===true){
