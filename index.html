@@ -487,6 +487,8 @@ body.reader-fullscreen #book-left{
   flex:1;min-height:0;
   overflow-x:hidden;overflow-y:hidden;
   padding:0.75rem;
+  position:relative;
+  -webkit-user-select:none;user-select:none;
 }
 
 /* 直排容器 */
@@ -499,6 +501,7 @@ body.reader-fullscreen #book-left{
   color:#2a1a0a;
   white-space:pre-wrap;word-break:break-all;
   text-align:justify;
+  -webkit-user-select:none;user-select:none;
 }
 
 /* 書卷風格主題（覆蓋 theme 變數） */
@@ -1054,7 +1057,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.6.9</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.7.2</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1110,6 +1113,7 @@ body.reader-fullscreen #book-left{
         </div>
         <div id="reading-area">
           <div id="text-container"></div>
+          <div id="page-indicator" style="position:absolute;bottom:6px;left:10px;font-size:11px;color:rgba(42,26,10,.4);font-family:var(--font-main);letter-spacing:.05em;writing-mode:horizontal-tb;pointer-events:none;z-index:10">1 / 1</div>
         </div>
         <!-- 右箭頭（上一頁，直排往右） -->
         <div id="page-next-zone" class="page-zone">
@@ -1150,11 +1154,13 @@ body.reader-fullscreen #book-left{
           style="width:46px;height:46px;font-size:22px;background:rgba(37,30,23,.6);border:1px solid rgba(201,168,76,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">▶</button>
       </div>
       <div id="float-speed-wrap">
-        <div id="float-speed-btns" style="display:flex;gap:3px;align-items:center">
+        <div id="float-speed-btns" style="display:flex;gap:2px;align-items:center">
           <button class="spd-seg" data-speed="100" onclick="setSegSpeed(100,this)">2x</button>
-          <button class="spd-seg" data-speed="200" onclick="setSegSpeed(200,this)">1.5x</button>
+          <button class="spd-seg" data-speed="167" onclick="setSegSpeed(167,this)">1.7x</button>
+          <button class="spd-seg" data-speed="233" onclick="setSegSpeed(233,this)">1.3x</button>
           <button class="spd-seg active" data-speed="300" onclick="setSegSpeed(300,this)">1x</button>
-          <button class="spd-seg" data-speed="400" onclick="setSegSpeed(400,this)">0.7x</button>
+          <button class="spd-seg" data-speed="367" onclick="setSegSpeed(367,this)">0.8x</button>
+          <button class="spd-seg" data-speed="433" onclick="setSegSpeed(433,this)">0.6x</button>
           <button class="spd-seg" data-speed="500" onclick="setSegSpeed(500,this)">0.5x</button>
         </div>
       </div>
@@ -1561,37 +1567,40 @@ body.reader-fullscreen #book-left{
 
 <!-- 編輯經文 Modal -->
 <div id="edit-modal-overlay" onclick="handleEditOverlayClick(event)" style="position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:1.5rem;writing-mode:horizontal-tb">
-  <div id="edit-modal" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:360px;overflow:hidden;animation:fadeIn .25s ease">
+  <div id="edit-modal" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:320px;overflow:hidden;animation:fadeIn .25s ease">
     <div class="modal-header">
-      <h3>✦ 編輯經文</h3>
+      <h3>✦ 修改遍數</h3>
       <button class="close-btn" onclick="closeEditModal()">✕</button>
     </div>
     <div class="modal-body">
-      <div id="import-title-row">
-        <label>經文名稱</label>
-        <input type="text" id="edit-title-input" placeholder="經文名稱">
+      <div style="text-align:center;margin-bottom:8px">
+        <div id="edit-lap-title" style="font-size:14px;color:var(--text);letter-spacing:.1em"></div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <label style="font-size:11px;color:var(--text3);letter-spacing:.1em">經文內容</label>
-        <textarea id="edit-textarea"
-          placeholder="經文內容…"
-          style="background:var(--bg3);border:1px solid var(--border2);
-                 color:var(--text);font-family:var(--font-main);font-size:15px;
-                 line-height:1.9;padding:1rem;border-radius:4px;resize:none;
-                 outline:none;height:200px;width:100%;
-                 transition:border-color .18s;-webkit-appearance:none"
-          onfocus="this.style.borderColor='var(--accent)'"
-          onblur="this.style.borderColor='var(--border2)'"></textarea>
+      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin:12px 0">
+        <button onclick="editLapAdjust(-1)"
+          style="width:48px;height:48px;border-radius:50%;background:transparent;
+                 border:2px solid var(--border2);color:var(--text2);font-size:24px;
+                 cursor:pointer;font-family:var(--font-main)">−</button>
+        <input type="number" id="edit-lap-input" min="0"
+          style="width:80px;text-align:center;font-size:28px;font-weight:700;
+                 color:var(--accent);background:var(--bg3);border:1px solid var(--border);
+                 border-radius:6px;padding:6px;font-family:var(--font-main);
+                 -webkit-appearance:none;-moz-appearance:textfield">
+        <button onclick="editLapAdjust(1)"
+          style="width:48px;height:48px;border-radius:50%;background:transparent;
+                 border:2px solid var(--border2);color:var(--text2);font-size:24px;
+                 cursor:pointer;font-family:var(--font-main)">+</button>
       </div>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:8px">遍</div>
       <div style="display:flex;gap:8px;margin-top:4px">
         <button onclick="closeEditModal()"
-          style="flex:1;min-height:48px;border-radius:4px;background:transparent;
+          style="flex:1;min-height:44px;border-radius:4px;background:transparent;
                  border:1px solid var(--border);color:var(--text2);
                  font-family:var(--font-main);font-size:14px;letter-spacing:.1em;cursor:pointer">
           取消
         </button>
-        <button onclick="confirmEdit()"
-          style="flex:1;min-height:48px;border-radius:4px;background:transparent;
+        <button onclick="confirmEditLap()"
+          style="flex:1;min-height:44px;border-radius:4px;background:transparent;
                  border:1px solid var(--accent);color:var(--accent);
                  font-family:var(--font-main);font-size:14px;letter-spacing:.1em;cursor:pointer">
           儲存
@@ -1735,7 +1744,7 @@ function renderLib(){
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
         <button class="lib-item-del" onclick="event.stopPropagation();openGoalModal('${encodeURIComponent(i.title)}')" aria-label="目標" style="color:var(--accent);font-size:13px" title="設定目標遍數">🎯</button>
-
+        <button class="lib-item-del" onclick="event.stopPropagation();openEditModal('${encodeURIComponent(i.title)}')" aria-label="修改遍數" style="color:var(--text3);font-size:13px" title="修改遍數">✎</button>
         <button class="lib-item-del" onclick="event.stopPropagation();openDeleteModal('${encodeURIComponent(i.title)}')" aria-label="刪除">✕</button>
       </div>
     </div>`;
@@ -1753,15 +1762,13 @@ function closeDeleteModal(){
   document.getElementById('delete-modal-overlay').style.display='none';
 }
 
-// ── 編輯 Modal ──
+// ── 修改遍數 Modal ──
 let editingTitle='';
 function openEditModal(encodedTitle){
   const title=decodeURIComponent(encodedTitle);
-  const item=loadLib().find(i=>i.title===title);
-  if(!item)return;
   editingTitle=title;
-  document.getElementById('edit-title-input').value=item.title;
-  document.getElementById('edit-textarea').value=item.text;
+  document.getElementById('edit-lap-title').textContent=title;
+  document.getElementById('edit-lap-input').value=getCurLap(title);
   document.getElementById('edit-modal-overlay').style.display='flex';
 }
 function closeEditModal(){
@@ -1770,20 +1777,17 @@ function closeEditModal(){
 function handleEditOverlayClick(e){
   if(e.target===document.getElementById('edit-modal-overlay'))closeEditModal();
 }
-function confirmEdit(){
-  const newTitle=document.getElementById('edit-title-input').value.trim();
-  const newText=document.getElementById('edit-textarea').value.trim();
-  if(!newTitle||!newText)return;
-  const lib=loadLib();
-  const idx=lib.findIndex(i=>i.title===editingTitle);
-  if(idx<0)return;
-  lib[idx]={title:newTitle,text:newText,date:lib[idx].date};
-  saveLib(lib);
-  // 若正在閱讀這篇則同步更新
-  if(currentTitle===editingTitle){
-    currentTitle=newTitle;
-    processText(newText);
-  }
+function editLapAdjust(delta){
+  const input=document.getElementById('edit-lap-input');
+  const val=Math.max(0,parseInt(input.value||'0')+delta);
+  input.value=val;
+}
+function confirmEditLap(){
+  const newLap=Math.max(0,parseInt(document.getElementById('edit-lap-input').value||'0'));
+  const d=loadCurLaps();
+  d[editingTitle]=newLap;
+  saveCurLaps(d);
+  if(currentTitle===editingTitle) updateLapDisplay(editingTitle);
   closeEditModal();
   renderLib();
 }
@@ -2268,31 +2272,54 @@ async function checkAndDownloadAudio(title){
     const cached=await getAudioData(title);
     if(cached && cached.mp3 && cached.timeline){
       console.log('[Audio] IDB 快取命中：'+title);
-      showAudioLoading('載入音頻中…');
       setupAudioMode(cached.mp3,cached.timeline);
       return;
     }
-    // 嘗試從 GitHub Pages 下載
+    // 嘗試從 GitHub Pages 下載 JSON（很小，直接抓）
     const jsonUrl=AUDIO_BASE+encodeURIComponent(title)+'.json';
     const jsonResp=await fetch(jsonUrl);
     if(!jsonResp.ok){ console.log('[Audio] 無音頻包：'+title); return; }
     const timeline=await jsonResp.json();
     if(!Array.isArray(timeline)||timeline.length===0) return;
 
-    // 下載 mp3
-    showAudioLoading('正在下載音頻朗讀包…');
+    // 背景下載 mp3（不擋操作，顯示進度條）
+    showAudioProgress('下載音頻朗讀包…', 0);
     const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3';
     const mp3Resp=await fetch(mp3Url);
-    if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); hideAudioLoading(); return; }
-    const mp3ArrayBuffer=await mp3Resp.arrayBuffer();
+    if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); hideAudioProgress(); return; }
 
-    // 存入 IDB（存 ArrayBuffer 相容性最好）
-    await saveAudioData(title,mp3ArrayBuffer,timeline);
-    setupAudioMode(mp3ArrayBuffer,timeline);
+    const contentLength=parseInt(mp3Resp.headers.get('content-length')||'0');
+    const reader=mp3Resp.body.getReader();
+    const chunks=[];
+    let received=0;
+
+    while(true){
+      const {done,value}=await reader.read();
+      if(done) break;
+      chunks.push(value);
+      received+=value.length;
+      if(contentLength>0){
+        const pct=Math.round((received/contentLength)*100);
+        showAudioProgress('下載音頻朗讀包…', pct);
+      }
+    }
+
+    // 合併 chunks
+    const mp3ArrayBuffer=new Uint8Array(received);
+    let pos=0;
+    for(const chunk of chunks){
+      mp3ArrayBuffer.set(chunk,pos);
+      pos+=chunk.length;
+    }
+
+    // 存入 IDB
+    await saveAudioData(title,mp3ArrayBuffer.buffer,timeline);
+    hideAudioProgress();
+    setupAudioMode(mp3ArrayBuffer.buffer,timeline);
     showAudioToast('音頻朗讀包已就緒');
   }catch(e){
     console.log('[Audio] 下載錯誤：',e);
-    hideAudioLoading();
+    hideAudioProgress();
   }
 }
 
@@ -2327,10 +2354,10 @@ function setupAudioMode(mp3Blob,timeline){
   sutraAudioPlayer.playbackRate=audioPlaybackRate;
   // 等音頻可以播放後才啟用 audioMode
   sutraAudioPlayer.oncanplay=()=>{
-    sutraAudioPlayer.oncanplay=null; // 只觸發一次
+    sutraAudioPlayer.oncanplay=null;
     audioMode=true;
     updateAudioIcon();
-    hideAudioLoading();
+    hideAudioProgress();
     console.log('[Audio] 音頻已就緒，可播放');
   };
   sutraAudioPlayer.onerror=(e)=>{
@@ -2338,7 +2365,7 @@ function setupAudioMode(mp3Blob,timeline){
     console.log('[Audio] 音頻載入失敗：',e);
     audioMode=false;
     updateAudioIcon();
-    hideAudioLoading();
+    hideAudioProgress();
   };
 }
 
@@ -2401,6 +2428,13 @@ document.addEventListener('visibilitychange',()=>{
     startAudioPoll();
   }
 });
+// 點擊螢幕時也重啟 polling（修正高亮中斷問題）
+document.getElementById('reading-area').addEventListener('click',()=>{
+  if(isPlaying && audioMode && sutraAudioPlayer && !sutraAudioPlayer.paused){
+    stopAudioPoll();
+    startAudioPoll();
+  }
+},{capture:true});
 
 // 音頻播放控制
 function startAudioChant(){
@@ -2460,23 +2494,30 @@ function showAudioToast(msg){
   setTimeout(()=>{el.style.opacity='0';setTimeout(()=>el.remove(),400);},2500);
 }
 
-function showAudioLoading(msg){
-  let overlay=document.getElementById('audio-loading-overlay');
-  if(!overlay){
-    overlay=document.createElement('div');
-    overlay.id='audio-loading-overlay';
-    overlay.style.cssText='position:fixed;inset:0;z-index:9998;background:rgba(26,20,16,.75);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;writing-mode:horizontal-tb';
-    overlay.innerHTML='<div style="width:32px;height:32px;border:3px solid rgba(201,168,76,.3);border-top-color:#c9a84c;border-radius:50%;animation:spin .7s linear infinite"></div><div id="audio-loading-msg" style="color:#e8c87a;font-size:14px;letter-spacing:.1em;font-family:var(--font-main)"></div>';
-    document.body.appendChild(overlay);
+// 非阻塞式下載進度條（底部小條）
+function showAudioProgress(msg, pct){
+  let bar=document.getElementById('audio-progress-bar');
+  if(!bar){
+    bar=document.createElement('div');
+    bar.id='audio-progress-bar';
+    bar.style.cssText='position:fixed;bottom:0;left:0;right:0;z-index:9998;background:rgba(26,20,16,.85);padding:6px 12px;display:flex;align-items:center;gap:8px;writing-mode:horizontal-tb';
+    bar.innerHTML=`
+      <span id="audio-progress-msg" style="color:#e8c87a;font-size:12px;letter-spacing:.06em;white-space:nowrap;font-family:var(--font-main)"></span>
+      <div style="flex:1;height:4px;background:rgba(201,168,76,.15);border-radius:2px;overflow:hidden">
+        <div id="audio-progress-fill" style="height:100%;background:#c9a84c;border-radius:2px;transition:width .2s;width:0%"></div>
+      </div>
+      <span id="audio-progress-pct" style="color:#c9a84c;font-size:11px;font-family:monospace;min-width:32px;text-align:right"></span>`;
+    document.body.appendChild(bar);
   }
-  overlay.style.display='flex';
-  const msgEl=document.getElementById('audio-loading-msg');
-  if(msgEl) msgEl.textContent=msg||'載入中…';
+  bar.style.display='flex';
+  document.getElementById('audio-progress-msg').textContent=msg||'下載中…';
+  document.getElementById('audio-progress-fill').style.width=pct+'%';
+  document.getElementById('audio-progress-pct').textContent=pct>0?pct+'%':'';
 }
 
-function hideAudioLoading(){
-  const overlay=document.getElementById('audio-loading-overlay');
-  if(overlay) overlay.style.display='none';
+function hideAudioProgress(){
+  const bar=document.getElementById('audio-progress-bar');
+  if(bar) bar.style.display='none';
 }
 
 function buildPages(onDone){
@@ -2587,6 +2628,8 @@ function showPage_num(p,noAnim){
   currentPage=p;
   const pg=document.getElementById('book-page-num');
   if(pg)pg.textContent=p+1;
+  const pi=document.getElementById('page-indicator');
+  if(pi)pi.textContent=(p+1)+' / '+pages.length;
   const c=document.getElementById('text-container');
   const area=document.getElementById('reading-area');
   const isVert=c.style.writingMode!=='horizontal-tb';
@@ -3896,8 +3939,9 @@ function updateLapBtn(){
   const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
   const useRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
   const lapBtn=document.getElementById('lap-btn');
-  // 使用念珠時不顯示按鈕，使用按鈕模式才顯示
-  if(lapBtn)lapBtn.style.display=(isLast&&!isPlaying&&currentTitle&&!useRosary)?'flex':'none';
+  // 音頻模式下最後一頁也顯示+1按鈕；非音頻模式需要停止播放才顯示
+  const showLap=isLast && currentTitle && !useRosary && (!isPlaying || audioMode);
+  if(lapBtn)lapBtn.style.display=showLap?'flex':'none';
 }
 function goNextPage(){
   if(currentPage<pages.length-1){
@@ -3932,9 +3976,8 @@ function syncAudioToCurrentIdx(){
   if(!audioMode||!sutraAudioPlayer||!sutraTimeline)return;
   const seg=sutraTimeline.find(s=>s.idx===currentIdx);
   if(seg){
-    // 加 0.05 秒偏移，確保落在目標句子範圍內而非邊界
     sutraAudioPlayer.currentTime=seg.start+0.05;
-    _syncLock=Date.now()+300; // 300ms 內 polling 不覆蓋 currentIdx
+    _syncLock=Date.now()+500; // 500ms 內 polling 不覆蓋 currentIdx
   }
 }
 // 根據字元偏移量找對應的句子索引
@@ -3951,15 +3994,15 @@ document.getElementById('btn-manual-lap').addEventListener('click',function(e){
   e.stopPropagation();
   if(!currentTitle)return;
   recordLap(currentTitle);
-  playLapSound(); // 按鈕永遠播木魚聲
+  playLapSound();
   this.style.transform='scale(1.2)';
   setTimeout(()=>{this.style.transform='';},180);
   // 跳回第一頁第一句
-  if(pages.length>1){
-    currentIdx=0;currentPage=-1;
-    showPage_num(0,false);
-    updateProgress();
-  }
+  currentIdx=0;currentPage=-1;
+  showPage_num(0,false);
+  updateProgress();
+  syncAudioToCurrentIdx();
+  updateLapBtn(); // 跳回第一頁後隱藏+1按鈕
 });
 document.getElementById('page-prev-zone').addEventListener('click',function(e){
   e.stopPropagation();
