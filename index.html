@@ -18,7 +18,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, serverTimestamp }
+import { getFirestore, doc, setDoc, getDoc, getDocs, collection, writeBatch, deleteDoc, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const firebaseConfig = {
@@ -34,188 +34,462 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// ── 掛載到 window 供全域使用 ──
 window._fbAuth = auth;
 window._fbDb = db;
 window._fbGoogleProvider = new GoogleAuthProvider();
 
-// 直接掛 signInWithPopup，由按鈕 onclick 同步觸發
-window._fbSignIn = () => {
-  signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
-    if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request'){
-      showToast('登入失敗：' + (e.code || e.message));
-    }
+// ══ Device ID ══
+const DEVICE_ID = (() => {
+  let id = localStorage.getItem('nnjy_deviceId');
+  if (!id) { id = Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('nnjy_deviceId', id); }
+  return id;
+})();
+
+// ══ 遍數事件 IDB（nnjy_laps_idb / lapEvents）══
+const LAPS_IDB_NAME = 'nnjy_laps_idb';
+const LAPS_STORE = 'lapEvents';
+
+function _openLapsIDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(LAPS_IDB_NAME, 2);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(LAPS_STORE)) {
+        const store = db.createObjectStore(LAPS_STORE, { keyPath: 'lapId' });
+        store.createIndex('title', 'title', { unique: false });
+        store.createIndex('synced', 'synced', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('lapSessions')) {
+        const ss = db.createObjectStore('lapSessions', { keyPath: 'sessionId' });
+        ss.createIndex('title', 'title', { unique: false });
+        ss.createIndex('synced', 'synced', { unique: false });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+window._openLapsIDB = _openLapsIDB;
+
+// 新增一筆遍數事件
+window._lapsAddEvent = async function(title) {
+  const lapId = 'lap_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+  const ev = { lapId, title, timestamp: Date.now(), device: DEVICE_ID, synced: 0 };
+  const idb = await _openLapsIDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(LAPS_STORE, 'readwrite');
+    tx.objectStore(LAPS_STORE).put(ev);
+    tx.oncomplete = () => { idb.close(); resolve(lapId); };
+    tx.onerror = e => { idb.close(); reject(e.target.error); };
   });
 };
-window._fbSignOut = async () => {
-  await signOut(auth);
-  showToast('已登出');
+
+// 取得某 title 所有事件（排序）
+window._lapsGetByTitle = async function(title) {
+  const idb = await _openLapsIDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(LAPS_STORE, 'readonly');
+    const req = tx.objectStore(LAPS_STORE).index('title').getAll(title);
+    req.onsuccess = () => { idb.close(); resolve((req.result || []).sort((a,b) => a.timestamp - b.timestamp)); };
+    req.onerror = e => { idb.close(); reject(e.target.error); };
+  });
 };
 
-// ── 綁定登入按鈕（module 載入完才綁，確保 signInWithPopup 在 user gesture 內） ──
+// 取得所有事件（stats 頁用）
+window._lapsGetAll = async function() {
+  const idb = await _openLapsIDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(LAPS_STORE, 'readonly');
+    const req = tx.objectStore(LAPS_STORE).getAll();
+    req.onsuccess = () => { idb.close(); resolve(req.result || []); };
+    req.onerror = e => { idb.close(); reject(e.target.error); };
+  });
+};
+
+// 取得未同步事件
+window._lapsGetUnsynced = async function() {
+  const idb = await _openLapsIDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(LAPS_STORE, 'readonly');
+    const req = tx.objectStore(LAPS_STORE).index('synced').getAll(0);
+    req.onsuccess = () => { idb.close(); resolve(req.result || []); };
+    req.onerror = e => { idb.close(); reject(e.target.error); };
+  });
+};
+
+// 標記已同步
+window._lapsMarkSynced = async function(lapIds) {
+  if (!lapIds.length) return;
+  const idb = await _openLapsIDB();
+  return new Promise((resolve) => {
+    const tx = idb.transaction(LAPS_STORE, 'readwrite');
+    const store = tx.objectStore(LAPS_STORE);
+    let pending = lapIds.length;
+    lapIds.forEach(id => {
+      const r = store.get(id);
+      r.onsuccess = () => { if (r.result) { r.result.synced = 1; store.put(r.result); } };
+    });
+    tx.oncomplete = () => { idb.close(); resolve(); };
+    tx.onerror = () => { idb.close(); resolve(); };
+  });
+};
+
+// 刪除某 title 所有事件（清除遍數）
+window._lapsClearTitle = async function(title) {
+  const idb = await _openLapsIDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(LAPS_STORE, 'readwrite');
+    const store = tx.objectStore(LAPS_STORE);
+    const req = store.index('title').getAll(title);
+    req.onsuccess = () => {
+      (req.result || []).forEach(ev => store.delete(ev.lapId));
+      tx.oncomplete = () => { idb.close(); resolve(); };
+    };
+    req.onerror = e => { idb.close(); reject(e.target.error); };
+  });
+};
+
+// 刪除指定多筆（修改遍數用）
+window._lapsDeleteByIds = async function(lapIds) {
+  if (!lapIds.length) return;
+  const idb = await _openLapsIDB();
+  return new Promise((resolve) => {
+    const tx = idb.transaction(LAPS_STORE, 'readwrite');
+    const store = tx.objectStore(LAPS_STORE);
+    lapIds.forEach(id => store.delete(id));
+    tx.oncomplete = () => { idb.close(); resolve(); };
+    tx.onerror = () => { idb.close(); resolve(); };
+  });
+};
+
+// ── signIn / signOut ──
+window._fbSignIn = () => {
+  signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
+    if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request')
+      showToast('登入失敗：' + (e.code || e.message));
+  });
+};
+window._fbSignOut = async () => { await signOut(auth); showToast('已登出'); };
+
 document.addEventListener('DOMContentLoaded', () => {
   const loginBtn = document.getElementById('btn-google-login');
   if(loginBtn) {
     loginBtn.addEventListener('click', () => {
       signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
-        if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request'){
+        if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request')
           showToast('登入失敗：' + (e.code || e.message));
-        }
       });
     });
   }
 });
 
-// ── Heartbeat Sync（心跳同步）──
-let _autoSyncTimer = null;
-// _isDirty 持久化到 localStorage，app 關掉重開仍能補推
+// ── Dirty flag ──
 let _isDirty = localStorage.getItem('nnjy_isDirty') === '1';
-
-function markDirty() {
-  _isDirty = true;
-  localStorage.setItem('nnjy_isDirty', '1');
-}
-function clearDirty() {
-  _isDirty = false;
-  localStorage.removeItem('nnjy_isDirty');
-}
+function markDirty() { _isDirty = true; localStorage.setItem('nnjy_isDirty', '1'); }
+function clearDirty() { _isDirty = false; localStorage.removeItem('nnjy_isDirty'); }
 window.markDirty = markDirty;
 window.clearDirty = clearDirty;
 
+// ── 心跳同步（10 分鐘）──
+let _autoSyncTimer = null;
 function startAutoSync() {
   if(_autoSyncTimer) clearInterval(_autoSyncTimer);
   _autoSyncTimer = setInterval(() => {
-    if(window._fbUser && _isDirty) {
-      window._fbPushCloud(window._fbUser.uid, true).then(() => clearDirty());
-    }
+    if(window._fbUser && _isDirty)
+      Promise.all([_fbSyncLaps(window._fbUser.uid, true), _fbPushCloud(window._fbUser.uid, true), _fbSyncSessions(window._fbUser.uid, true)]).then(() => clearDirty());
   }, 10 * 60 * 1000);
 }
-function stopAutoSync() {
-  if(_autoSyncTimer) { clearInterval(_autoSyncTimer); _autoSyncTimer = null; }
-}
+function stopAutoSync() { if(_autoSyncTimer) { clearInterval(_autoSyncTimer); _autoSyncTimer = null; } }
 
-// ── 斷網補推：網路恢復時若有未推資料，立即補送 ──
+// ── 斷網補推 ──
 window.addEventListener('online', () => {
   if(window._fbUser && _isDirty) {
-    window._fbPushCloud(window._fbUser.uid, true).then(() => {
-      clearDirty();
-      showToast('✦ 網路已恢復，資料已同步');
-    });
+    Promise.all([_fbSyncLaps(window._fbUser.uid, true), _fbPushCloud(window._fbUser.uid, true), _fbSyncSessions(window._fbUser.uid, true)])
+      .then(() => { clearDirty(); showToast('✦ 網路已恢復，資料已同步'); });
   }
 });
 
+// ══ 遍數同步到 Firestore ══
+async function _fbSyncLaps(uid, silent=false) {
+  if(!uid) return;
+  try {
+    const unsynced = await window._lapsGetUnsynced();
+    if (!unsynced.length) return;
+    const chunks = [];
+    for(let i=0; i<unsynced.length; i+=499) chunks.push(unsynced.slice(i, i+499));
+    for(const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(ev => {
+        batch.set(doc(db, 'users', uid, 'laps', ev.lapId),
+          { title: ev.title, timestamp: ev.timestamp, device: ev.device, _createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+      await window._lapsMarkSynced(chunk.map(e => e.lapId));
+    }
+    if(!silent) showToast('✦ 遍數已同步到雲端');
+    localStorage.setItem('nnjy_syncTs', Date.now());
+    if(typeof updateSyncLastTime === 'function') updateSyncLastTime();
+  } catch(e) {
+    if(!silent) showToast('遍數同步失敗：' + e.message);
+  }
+}
+window._fbSyncLaps = _fbSyncLaps;
+
+// ══ 從雲端拉取遍數（登入時合併，聯集不重複）══
+async function _fbPullLaps(uid) {
+  if(!uid) return;
+  try {
+    const snap = await getDocs(collection(db, 'users', uid, 'laps'));
+    if(snap.empty) return;
+    const localAll = await window._lapsGetAll();
+    const localIds = new Set(localAll.map(e => e.lapId));
+    const toAdd = [];
+    snap.forEach(d => {
+      if(!localIds.has(d.id)) {
+        const data = d.data();
+        toAdd.push({ lapId: d.id, title: data.title, timestamp: data.timestamp || Date.now(), device: data.device || 'cloud', synced: 1 });
+      }
+    });
+    if(!toAdd.length) return;
+    const idb = await _openLapsIDB();
+    await new Promise((resolve, reject) => {
+      const tx = idb.transaction(LAPS_STORE, 'readwrite');
+      const store = tx.objectStore(LAPS_STORE);
+      toAdd.forEach(ev => store.put(ev));
+      tx.oncomplete = () => { idb.close(); resolve(); };
+      tx.onerror = e => { idb.close(); reject(e.target.error); };
+    });
+    const affectedTitles = [...new Set(toAdd.map(e => e.title))];
+    for(const t of affectedTitles) if(typeof updateLapDisplay === 'function') updateLapDisplay(t);
+    if(typeof renderLib === 'function') renderLib();
+    showToast('✦ 雲端遍數記錄已載入');
+  } catch(e) { console.error('拉取遍數失敗', e); }
+}
+
+// ══ 雲端刪除某 title 遍數（清除用）══
+window._fbClearLapsCloud = async function(uid, title) {
+  if(!uid) return;
+  try {
+    const snap = await getDocs(collection(db, 'users', uid, 'laps'));
+    if(snap.empty) return;
+    const batch = writeBatch(db);
+    let count = 0;
+    snap.forEach(d => { if(d.data().title === title) { batch.delete(d.ref); count++; } });
+    if(count > 0) await batch.commit();
+  } catch(e) { console.error('雲端清除遍數失敗', e); }
+};
+
+// ══ 雲端刪除指定 lapIds ══
+window._fbDeleteLapIds = async function(uid, lapIds) {
+  if(!uid || !lapIds.length) return;
+  try {
+    const chunks = [];
+    for(let i=0; i<lapIds.length; i+=499) chunks.push(lapIds.slice(i, i+499));
+    for(const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(id => batch.delete(doc(db, 'users', uid, 'laps', id)));
+      await batch.commit();
+    }
+  } catch(e) { console.error('雲端刪除 lapIds 失敗', e); }
+};
+
+// ══ Session IDB（nnjy_laps_idb / lapSessions）══
+// 每筆：{ sessionId, title, startTs, device, synced }
+const SESS_STORE = 'lapSessions';
+
+function _openSessionsIDB() {
+  return new Promise((resolve, reject) => {
+    // 升級 IDB 版本至 2，加入 lapSessions store
+    const req = indexedDB.open(LAPS_IDB_NAME, 2);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(LAPS_STORE)) {
+        const store = db.createObjectStore(LAPS_STORE, { keyPath: 'lapId' });
+        store.createIndex('title', 'title', { unique: false });
+        store.createIndex('synced', 'synced', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(SESS_STORE)) {
+        const ss = db.createObjectStore(SESS_STORE, { keyPath: 'sessionId' });
+        ss.createIndex('title', 'title', { unique: false });
+        ss.createIndex('synced', 'synced', { unique: false });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// 取得某 title 最新 session（決定本輪起始點）
+window._sessGetLatest = async function(title) {
+  const idb = await _openSessionsIDB();
+  return new Promise((resolve) => {
+    const tx = idb.transaction(SESS_STORE, 'readonly');
+    const req = tx.objectStore(SESS_STORE).index('title').getAll(title);
+    req.onsuccess = () => {
+      idb.close();
+      const all = (req.result || []).sort((a,b) => b.startTs - a.startTs);
+      resolve(all[0] || null);
+    };
+    req.onerror = () => { idb.close(); resolve(null); };
+  });
+};
+
+// 新增一筆 session（開始新一輪）
+window._sessAddNew = async function(title) {
+  const sessionId = 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2);
+  const ev = { sessionId, title, startTs: Date.now(), device: DEVICE_ID, synced: 0 };
+  const idb = await _openSessionsIDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(SESS_STORE, 'readwrite');
+    tx.objectStore(SESS_STORE).put(ev);
+    tx.oncomplete = () => { idb.close(); resolve(sessionId); };
+    tx.onerror = e => { idb.close(); reject(e.target.error); };
+  });
+};
+
+// 取得未同步 sessions
+window._sessGetUnsynced = async function() {
+  const idb = await _openSessionsIDB();
+  return new Promise((resolve) => {
+    const tx = idb.transaction(SESS_STORE, 'readonly');
+    const req = tx.objectStore(SESS_STORE).index('synced').getAll(0);
+    req.onsuccess = () => { idb.close(); resolve(req.result || []); };
+    req.onerror = () => { idb.close(); resolve([]); };
+  });
+};
+
+// 標記 sessions 已同步
+window._sessMarkSynced = async function(sessionIds) {
+  if (!sessionIds.length) return;
+  const idb = await _openSessionsIDB();
+  return new Promise((resolve) => {
+    const tx = idb.transaction(SESS_STORE, 'readwrite');
+    const store = tx.objectStore(SESS_STORE);
+    sessionIds.forEach(id => {
+      const r = store.get(id);
+      r.onsuccess = () => { if (r.result) { r.result.synced = 1; store.put(r.result); } };
+    });
+    tx.oncomplete = () => { idb.close(); resolve(); };
+    tx.onerror = () => { idb.close(); resolve(); };
+  });
+};
+
+// 取得某 title 本輪遍數（最新 session 之後的 lapEvents 筆數）
+window._getCurLapCount = async function(title) {
+  const [evs, sess] = await Promise.all([
+    window._lapsGetByTitle(title),
+    window._sessGetLatest(title),
+  ]);
+  const startTs = sess ? sess.startTs : 0;
+  return evs.filter(e => e.timestamp > startTs).length;
+};
+
+// ══ Session 同步到 Firestore ══
+async function _fbSyncSessions(uid, silent=false) {
+  if(!uid) return;
+  try {
+    const unsynced = await window._sessGetUnsynced();
+    if (!unsynced.length) return;
+    const chunks = [];
+    for(let i=0; i<unsynced.length; i+=499) chunks.push(unsynced.slice(i, i+499));
+    for(const chunk of chunks) {
+      const batch = writeBatch(db);
+      chunk.forEach(ev => {
+        batch.set(doc(db, 'users', uid, 'sessions', ev.sessionId),
+          { title: ev.title, startTs: ev.startTs, device: ev.device, _createdAt: serverTimestamp() });
+      });
+      await batch.commit();
+      await window._sessMarkSynced(chunk.map(e => e.sessionId));
+    }
+  } catch(e) { if(!silent) console.error('session 同步失敗', e); }
+}
+window._fbSyncSessions = _fbSyncSessions;
+
+// ══ 從雲端拉取 sessions ══
+async function _fbPullSessions(uid) {
+  if(!uid) return;
+  try {
+    const snap = await getDocs(collection(db, 'users', uid, 'sessions'));
+    if(snap.empty) return;
+    const idb = await _openSessionsIDB();
+    const localAll = await new Promise(resolve => {
+      const tx = idb.transaction(SESS_STORE, 'readonly');
+      const req = tx.objectStore(SESS_STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    });
+    const localIds = new Set(localAll.map(e => e.sessionId));
+    const toAdd = [];
+    snap.forEach(d => {
+      if(!localIds.has(d.id)) {
+        const data = d.data();
+        toAdd.push({ sessionId: d.id, title: data.title, startTs: data.startTs || 0, device: data.device || 'cloud', synced: 1 });
+      }
+    });
+    if(!toAdd.length) { idb.close(); return; }
+    await new Promise((resolve) => {
+      const tx = idb.transaction(SESS_STORE, 'readwrite');
+      const store = tx.objectStore(SESS_STORE);
+      toAdd.forEach(ev => store.put(ev));
+      tx.oncomplete = () => { idb.close(); resolve(); };
+      tx.onerror = () => { idb.close(); resolve(); };
+    });
+    const titles = [...new Set(toAdd.map(e => e.title))];
+    for(const t of titles) if(typeof updateLapDisplay === 'function') updateLapDisplay(t);
+  } catch(e) { console.error('拉取 sessions 失敗', e); }
+}
+
+// ── 非遍數資料推送（書庫/目標）──
+function _collectLocalData() {
+  const get = k => { try { return JSON.parse(localStorage.getItem(k)) } catch { return null } };
+  return { sutra_library: get('sutra_library') || [], nnjy_goals: get('nnjy_goals') || {}, _localTs: Date.now() };
+}
+
+window._fbPushCloud = async (uid, silent=false) => {
+  if(!uid) return;
+  try {
+    await setDoc(doc(db, 'users', uid, 'data', 'main'), { ..._collectLocalData(), _updatedAt: serverTimestamp() });
+    if(!silent) showToast('✦ 已同步到雲端');
+    localStorage.setItem('nnjy_syncTs', Date.now());
+    if(typeof updateSyncLastTime === 'function') updateSyncLastTime();
+  } catch(e) { if(!silent) showToast('同步失敗：' + e.message); }
+};
+const _fbPushCloud = window._fbPushCloud;
+
+window._fbPullCloud = async (uid) => {
+  if(!uid) return;
+  try {
+    const snap = await getDoc(doc(db, 'users', uid, 'data', 'main'));
+    if(!snap.exists()) { _fbPushCloud(uid); _fbPullLaps(uid); return; }
+    const cloud = snap.data();
+    const local = _collectLocalData();
+    const libMap = {};
+    (local.sutra_library || []).forEach(i => libMap[i.title] = i);
+    (cloud.sutra_library || []).forEach(i => libMap[i.title] = i);
+    const cloudNewer = (cloud._localTs || 0) >= (local._localTs || 0);
+    const goals = cloudNewer ? (cloud.nnjy_goals || local.nnjy_goals) : (local.nnjy_goals || cloud.nnjy_goals);
+    localStorage.setItem('sutra_library', JSON.stringify(Object.values(libMap)));
+    localStorage.setItem('nnjy_goals', JSON.stringify(goals || {}));
+    localStorage.setItem('nnjy_localTs', Date.now());
+    if(typeof renderLib === 'function') renderLib();
+    showToast('✦ 雲端資料已載入');
+  } catch(e) { console.error('拉取失敗', e); }
+  await _fbPullLaps(uid);
+  _fbPullSessions(uid);
+};
+
 // ── 監聽登入狀態 ──
-let _isFirstAuth = true; // 區分「頁面開啟時已登入」vs「使用者剛登入」
+let _isFirstAuth = true;
 onAuthStateChanged(auth, user => {
   const wasNull = !window._fbUser;
   window._fbUser = user || null;
   updateSyncUI(user);
   if(user) {
-    if(_isFirstAuth) {
-      // 頁面開啟時已登入 → 從雲端拉取資料合併
-      window._fbPullCloud(user.uid);
-    } else if(wasNull) {
-      // 使用者剛完成登入 → 從雲端拉取資料合併
-      window._fbPullCloud(user.uid);
-    }
+    if(_isFirstAuth || wasNull) window._fbPullCloud(user.uid);
     startAutoSync();
-  } else {
-    stopAutoSync();
-  }
+  } else { stopAutoSync(); }
   _isFirstAuth = false;
 });
-
-// ── 收集所有本機資料 ──
-function collectLocalData() {
-  const get = k => { try { return JSON.parse(localStorage.getItem(k)) } catch { return null } };
-  return {
-    sutra_library:    get('sutra_library')    || [],
-    nnjy_stats:       get('nnjy_stats')       || [],
-    nnjy_goals:       get('nnjy_goals')       || {},
-    nnjy_laps:        get('nnjy_laps')        || {},
-    nnjy_cur_laps:    get('nnjy_cur_laps')    || {},
-    _localTs: Date.now(),
-  };
-}
-
-// ── 推送到雲端 ──
-window._fbPushCloud = async (uid, silent=false) => {
-  if(!uid) return;
-  const data = collectLocalData();
-  try {
-    await setDoc(doc(db, 'users', uid, 'data', 'main'), {
-      ...data,
-      _updatedAt: serverTimestamp(),
-    });
-    if(!silent) showToast('✦ 已同步到雲端');
-    localStorage.setItem('nnjy_syncTs', Date.now());
-    if(typeof updateSyncLastTime === 'function') updateSyncLastTime();
-  } catch(e) {
-    if(!silent) showToast('同步失敗：' + e.message);
-  }
-};
-
-// ── 從雲端拉取並合併 ──
-window._fbPullCloud = async (uid) => {
-  if(!uid) return;
-  try {
-    const snap = await getDoc(doc(db, 'users', uid, 'data', 'main'));
-    if(!snap.exists()) {
-      // 雲端無資料，直接推上去
-      window._fbPushCloud(uid);
-      return;
-    }
-    const cloud = snap.data();
-    const localTs = parseInt(localStorage.getItem('nnjy_localTs') || '0');
-    const cloudTs = cloud._localTs || 0;
-
-    // 合併策略：書庫以雲端為主（若雲端較新）＋ 統計取聯集
-    const merged = mergeData(cloud, collectLocalData());
-    applyData(merged);
-    localStorage.setItem('nnjy_localTs', Date.now());
-    showToast('✦ 雲端資料已載入');
-  } catch(e) {
-    console.error('拉取失敗', e);
-  }
-};
-
-// ── 合併策略 ──
-function mergeData(cloud, local) {
-  // 書庫：以標題為 key，合併兩邊，雲端覆蓋同名項目
-  const libMap = {};
-  (local.sutra_library || []).forEach(i => libMap[i.title] = i);
-  (cloud.sutra_library || []).forEach(i => libMap[i.title] = i);
-
-  // 統計：取聯集（以 date+title 為 key）
-  const statsMap = {};
-  const keyOf = s => s.date + '|' + s.title;
-  (local.nnjy_stats || []).forEach(s => statsMap[keyOf(s)] = s);
-  (cloud.nnjy_stats || []).forEach(s => {
-    const k = keyOf(s);
-    if(!statsMap[k] || (s.laps||0) > (statsMap[k].laps||0)) statsMap[k] = s;
-  });
-
-  // 其他：雲端較新時用雲端，否則用本機
-  const cloudNewer = (cloud._localTs || 0) >= (local._localTs || 0);
-  return {
-    sutra_library: Object.values(libMap),
-    nnjy_stats:    Object.values(statsMap),
-    nnjy_goals:    cloudNewer ? (cloud.nnjy_goals || local.nnjy_goals) : (local.nnjy_goals || cloud.nnjy_goals),
-    nnjy_laps:     cloudNewer ? (cloud.nnjy_laps  || local.nnjy_laps)  : (local.nnjy_laps  || cloud.nnjy_laps),
-    nnjy_cur_laps: cloudNewer ? (cloud.nnjy_cur_laps || local.nnjy_cur_laps) : (local.nnjy_cur_laps || cloud.nnjy_cur_laps),
-  };
-}
-
-// ── 套用合併後的資料到 app ──
-function applyData(d) {
-  localStorage.setItem('sutra_library',  JSON.stringify(d.sutra_library));
-  localStorage.setItem('nnjy_stats',     JSON.stringify(d.nnjy_stats));
-  localStorage.setItem('nnjy_goals',     JSON.stringify(d.nnjy_goals));
-  localStorage.setItem('nnjy_laps',      JSON.stringify(d.nnjy_laps));
-  localStorage.setItem('nnjy_cur_laps',  JSON.stringify(d.nnjy_cur_laps));
-  // 重新渲染書庫
-  if(typeof renderLib === 'function') renderLib();
-}
 </script>
 <style>
 :root{
@@ -1057,7 +1331,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.7.2</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.7.4</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1213,6 +1487,36 @@ body.reader-fullscreen #book-left{
 
 <!-- 遍數浮現動畫 -->
 <div id="lap-flash"></div>
+
+<!-- 開始新一輪提示 -->
+<div id="new-round-overlay"
+  style="display:none;position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.65);
+         align-items:center;justify-content:center;padding:1.5rem;writing-mode:horizontal-tb">
+  <div style="background:var(--bg);border:2px solid var(--accent);border-radius:10px;
+              width:100%;max-width:300px;padding:1.5rem;text-align:center;
+              font-family:var(--font-main);animation:fadeIn .3s ease">
+    <div style="font-size:32px;margin-bottom:.5rem">🙏</div>
+    <div id="new-round-title"
+      style="font-size:16px;color:var(--accent);letter-spacing:.12em;margin-bottom:.4rem"></div>
+    <div style="font-size:13px;color:var(--text3);letter-spacing:.08em;margin-bottom:1.5rem;line-height:1.8">
+      開始新一輪？<br>歷史遍數繼續累積
+    </div>
+    <div style="display:flex;gap:10px">
+      <button onclick="closeNewRoundPrompt()"
+        style="flex:1;min-height:44px;border-radius:4px;background:transparent;
+               border:1px solid var(--border);color:var(--text2);
+               font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
+        稍後再說
+      </button>
+      <button onclick="confirmNewRound()"
+        style="flex:1;min-height:44px;border-radius:4px;background:var(--accent);
+               border:none;color:#f5edd8;
+               font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
+        開始新一輪
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- 手動安裝說明 overlay -->
 <div id="install-guide-overlay" style="display:none;position:fixed;inset:0;z-index:600;
@@ -1544,7 +1848,7 @@ body.reader-fullscreen #book-left{
               width:100%;max-width:320px;padding:1.5rem;text-align:center">
     <div id="delete-modal-title"
       style="font-family:var(--font-main);font-size:15px;color:var(--text);
-             letter-spacing:.08em;margin-bottom:1.25rem;line-height:1.8"></div>
+             letter-spacing:.08em;margin-bottom:1.25rem;line-height:1.8;white-space:pre-line"></div>
     <div style="font-size:12px;color:var(--text3);margin-bottom:1.5rem;font-family:var(--font-main)">
       刪除後無法復原
     </div>
@@ -1569,7 +1873,7 @@ body.reader-fullscreen #book-left{
 <div id="edit-modal-overlay" onclick="handleEditOverlayClick(event)" style="position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:1.5rem;writing-mode:horizontal-tb">
   <div id="edit-modal" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:320px;overflow:hidden;animation:fadeIn .25s ease">
     <div class="modal-header">
-      <h3>✦ 修改遍數</h3>
+      <h3>✦ 本輪遍數</h3>
       <button class="close-btn" onclick="closeEditModal()">✕</button>
     </div>
     <div class="modal-body">
@@ -1591,7 +1895,15 @@ body.reader-fullscreen #book-left{
                  border:2px solid var(--border2);color:var(--text2);font-size:24px;
                  cursor:pointer;font-family:var(--font-main)">+</button>
       </div>
-      <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:8px">遍</div>
+      <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:12px">本輪遍數</div>
+      <div style="margin-bottom:8px">
+        <button onclick="confirmStartNewRoundFromModal()"
+          style="width:100%;min-height:44px;border-radius:4px;background:transparent;
+                 border:1px solid var(--accent);color:var(--accent);
+                 font-family:var(--font-main);font-size:14px;letter-spacing:.1em;cursor:pointer">
+          🔄 開始新一輪
+        </button>
+      </div>
       <div style="display:flex;gap:8px;margin-top:4px">
         <button onclick="closeEditModal()"
           style="flex:1;min-height:44px;border-radius:4px;background:transparent;
@@ -1713,34 +2025,24 @@ function renderLib(){
     el.innerHTML='<div class="lib-empty">尚無儲存的經文<br>貼上後自動儲存</div>';return;
   }
   const goals=loadGoals();
-  const stats=loadStats();
-
-  // 排序：類別順序 → 筆畫
   const sorted=[...lib].sort((a,b)=>{
     const ca=CAT_ORDER[a.category??'其他']??2;
     const cb=CAT_ORDER[b.category??'其他']??2;
     if(ca!==cb)return ca-cb;
     return strokeSort(a.title)-strokeSort(b.title);
   });
-
-  // 依類別分組顯示
   let lastCat=null;
   el.innerHTML=sorted.map(i=>{
-    const total=stats.filter(s=>s.title===i.title).reduce((a,b)=>a+b.laps,0);
-    const goal=goals[i.title]||0;
-    const goalStr=goal>0?`<span style="color:var(--accent)">${total}</span>/${goal} 遍`:`${total>0?total+' 遍':''}`;
     const cat=i.category||'其他';
     let header='';
     if(cat!==lastCat){
       lastCat=cat;
-      header=`<div style="font-family:var(--font-main);font-size:11px;color:var(--text3);
-        letter-spacing:.15em;padding:.6rem 1rem .3rem;border-top:${lastCat&&lastCat!==cat?'1px solid var(--border2)':'none'}">
-        ${cat}</div>`;
+      header=`<div style="font-family:var(--font-main);font-size:11px;color:var(--text3);letter-spacing:.15em;padding:.6rem 1rem .3rem">${cat}</div>`;
     }
     return header+`<div class="lib-item" onclick="openFromLib('${encodeURIComponent(i.title)}')">
       <div class="lib-item-info">
         <div class="lib-item-title">${i.title}</div>
-        <div class="lib-item-meta">${i.date}${goalStr?' ‧ '+goalStr:''}</div>
+        <div class="lib-item-meta" id="lib-meta-${encodeURIComponent(i.title)}">${i.date}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
         <button class="lib-item-del" onclick="event.stopPropagation();openGoalModal('${encodeURIComponent(i.title)}')" aria-label="目標" style="color:var(--accent);font-size:13px" title="設定目標遍數">🎯</button>
@@ -1749,6 +2051,15 @@ function renderLib(){
       </div>
     </div>`;
   }).join('');
+  // 異步填入本輪遍數
+  sorted.forEach(async i=>{
+    const metaEl=document.getElementById('lib-meta-'+encodeURIComponent(i.title));
+    if(!metaEl)return;
+    const total=window._getCurLapCount ? await window._getCurLapCount(i.title) : 0;
+    const goal=goals[i.title]||0;
+    const goalStr=goal>0?`<span style="color:var(--accent)">${total}</span>/${goal} 遍`:`${total>0?total+' 遍':''}`;
+    metaEl.innerHTML=i.date+(goalStr?' ‧ '+goalStr:'');
+  });
 }
 
 // ── 刪除確認 Modal ──
@@ -1760,6 +2071,9 @@ function openDeleteModal(encodedTitle){
 }
 function closeDeleteModal(){
   document.getElementById('delete-modal-overlay').style.display='none';
+  // 還原確認按鈕文字
+  const btn=document.getElementById('delete-modal-confirm');
+  if(btn) btn.textContent='刪除';
 }
 
 // ── 修改遍數 Modal ──
@@ -1768,12 +2082,18 @@ function openEditModal(encodedTitle){
   const title=decodeURIComponent(encodedTitle);
   editingTitle=title;
   document.getElementById('edit-lap-title').textContent=title;
-  document.getElementById('edit-lap-input').value=getCurLap(title);
+  document.getElementById('edit-lap-input').value='0';
   document.getElementById('edit-modal-overlay').style.display='flex';
+  if(window._getCurLapCount){
+    window._getCurLapCount(title).then(n=>{
+      document.getElementById('edit-lap-input').value=n;
+    });
+  }
 }
 function closeEditModal(){
   document.getElementById('edit-modal-overlay').style.display='none';
 }
+// clearLapFromEditModal removed (replaced by startNewRoundFromModal)
 function handleEditOverlayClick(e){
   if(e.target===document.getElementById('edit-modal-overlay'))closeEditModal();
 }
@@ -1782,11 +2102,31 @@ function editLapAdjust(delta){
   const val=Math.max(0,parseInt(input.value||'0')+delta);
   input.value=val;
 }
-function confirmEditLap(){
-  const newLap=Math.max(0,parseInt(document.getElementById('edit-lap-input').value||'0'));
-  const d=loadCurLaps();
-  d[editingTitle]=newLap;
-  saveCurLaps(d);
+async function confirmEditLap(){
+  const target=Math.max(0,parseInt(document.getElementById('edit-lap-input').value||'0'));
+  if(!window._getCurLapCount){closeEditModal();return;}
+  const current=await window._getCurLapCount(editingTitle);
+  const diff=target-current;
+  if(diff>0){
+    // 新增指定筆數的本輪事件
+    for(let i=0;i<diff;i++) await window._lapsAddEvent(editingTitle);
+    markDirty();
+    if(window._fbUser && window._fbSyncLaps)
+      window._fbSyncLaps(window._fbUser.uid,true).then(()=>clearDirty());
+  }else if(diff<0){
+    // 刪除本輪最近幾筆
+    const sess=await window._sessGetLatest(editingTitle);
+    const startTs=sess?sess.startTs:0;
+    const allEvs=await window._lapsGetByTitle(editingTitle);
+    const curEvs=allEvs.filter(e=>e.timestamp>startTs).sort((a,b)=>b.timestamp-a.timestamp);
+    const toDelete=curEvs.slice(0,Math.abs(diff));
+    const ids=toDelete.map(e=>e.lapId);
+    if(ids.length){
+      await window._lapsDeleteByIds(ids);
+      if(window._fbUser && window._fbDeleteLapIds)
+        window._fbDeleteLapIds(window._fbUser.uid,ids).catch(()=>{});
+    }
+  }
   if(currentTitle===editingTitle) updateLapDisplay(editingTitle);
   closeEditModal();
   renderLib();
@@ -2256,35 +2596,61 @@ function getAudioData(title){
   }));
 }
 
-function saveAudioData(title,mp3Blob,timeline){
+function saveAudioData(title,mp3Blob,timeline,ver){
   return openAudioIDB().then(db=>new Promise((res,rej)=>{
     const tx=db.transaction(AUDIO_IDB_STORE,'readwrite');
-    tx.objectStore(AUDIO_IDB_STORE).put({title,mp3:mp3Blob,timeline});
+    tx.objectStore(AUDIO_IDB_STORE).put({title,mp3:mp3Blob,timeline,ver:ver||0});
     tx.oncomplete=()=>res();
     tx.onerror=()=>rej(tx.error);
   }));
 }
 
-// 檢查並自動下載音頻包
+// ══ 音頻 manifest 自動更新 ══
+let _audioManifest=null;
+
+async function fetchAudioManifest(){
+  try{
+    const resp=await fetch(AUDIO_BASE+'manifest.json?t='+Date.now());
+    if(!resp.ok) return null;
+    _audioManifest=await resp.json();
+    console.log('[Audio] manifest 載入：',Object.keys(_audioManifest).length,'筆');
+    return _audioManifest;
+  }catch(e){
+    console.log('[Audio] manifest 載入失敗：',e);
+    return null;
+  }
+}
+
+// 檢查並自動下載音頻包（含版本比對）
 async function checkAndDownloadAudio(title){
   try{
+    // 取得 manifest 版本號
+    const manifestVer=_audioManifest?.[title]?.ver||0;
+
     // 先檢查 IDB
     const cached=await getAudioData(title);
     if(cached && cached.mp3 && cached.timeline){
-      console.log('[Audio] IDB 快取命中：'+title);
-      setupAudioMode(cached.mp3,cached.timeline);
-      return;
+      // 比對版本號
+      const localVer=cached.ver||0;
+      if(localVer>=manifestVer || manifestVer===0){
+        console.log('[Audio] IDB 快取命中（v'+localVer+'）：'+title);
+        setupAudioMode(cached.mp3,cached.timeline);
+        return;
+      }
+      console.log('[Audio] 有新版本 v'+localVer+' → v'+manifestVer+'：'+title);
     }
-    // 嘗試從 GitHub Pages 下載 JSON（很小，直接抓）
-    const jsonUrl=AUDIO_BASE+encodeURIComponent(title)+'.json';
+
+    // 嘗試從 GitHub Pages 下載 JSON
+    const jsonUrl=AUDIO_BASE+encodeURIComponent(title)+'.json?t='+Date.now();
     const jsonResp=await fetch(jsonUrl);
     if(!jsonResp.ok){ console.log('[Audio] 無音頻包：'+title); return; }
     const timeline=await jsonResp.json();
     if(!Array.isArray(timeline)||timeline.length===0) return;
 
     // 背景下載 mp3（不擋操作，顯示進度條）
-    showAudioProgress('下載音頻朗讀包…', 0);
-    const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3';
+    const updateMsg=cached?'更新音頻朗讀包…':'下載音頻朗讀包…';
+    showAudioProgress(updateMsg, 0);
+    const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3?t='+Date.now();
     const mp3Resp=await fetch(mp3Url);
     if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); hideAudioProgress(); return; }
 
@@ -2300,7 +2666,7 @@ async function checkAndDownloadAudio(title){
       received+=value.length;
       if(contentLength>0){
         const pct=Math.round((received/contentLength)*100);
-        showAudioProgress('下載音頻朗讀包…', pct);
+        showAudioProgress(updateMsg, pct);
       }
     }
 
@@ -2312,11 +2678,11 @@ async function checkAndDownloadAudio(title){
       pos+=chunk.length;
     }
 
-    // 存入 IDB
-    await saveAudioData(title,mp3ArrayBuffer.buffer,timeline);
+    // 存入 IDB（含版本號）
+    await saveAudioData(title,mp3ArrayBuffer.buffer,timeline,manifestVer);
     hideAudioProgress();
     setupAudioMode(mp3ArrayBuffer.buffer,timeline);
-    showAudioToast('音頻朗讀包已就緒');
+    showAudioToast(cached?'音頻已更新至 v'+manifestVer:'音頻朗讀包已就緒');
   }catch(e){
     console.log('[Audio] 下載錯誤：',e);
     hideAudioProgress();
@@ -2403,7 +2769,17 @@ function startAudioPoll(){
     if(!sutraAudioPlayer||sutraAudioPlayer.paused||!sutraTimeline)return;
     if(Date.now()<_syncLock)return;
     const t=sutraAudioPlayer.currentTime;
-    const idx=sutraTimeline.findIndex(s=>t>=s.start&&t<s.end);
+    let idx=sutraTimeline.findIndex(s=>t>=s.start&&t<s.end);
+    // 找不到精確匹配時，在間隔過半就提前跳到下一句
+    if(idx<0){
+      for(let i=0;i<sutraTimeline.length-1;i++){
+        const gap=sutraTimeline[i+1].start-sutraTimeline[i].end;
+        const mid=sutraTimeline[i].end+gap*0.5;
+        if(t>=mid&&t<sutraTimeline[i+1].start){
+          idx=i+1; break;
+        }
+      }
+    }
     if(idx>=0&&idx!==currentIdx){
       currentIdx=idx;
       if(sentencePageMap&&sentencePageMap[idx]!==undefined){
@@ -3068,28 +3444,29 @@ function toggleTTS(){
   else if(!ttsEnabled&&window.speechSynthesis)speechSynthesis.cancel();
 }
 
-// ══ 統計資料（localStorage）══
-const STATS_KEY='nnjy_stats';   // {date:'YYYY-MM-DD', title, laps}[]
-const POS_KEY='nnjy_pos';       // {title: {page, sentIdx}}
-const LAP_KEY='nnjy_laps';      // {title: lapCount} 當前遍數暫存
+// ══ 統計資料 ══
+const STATS_KEY='nnjy_stats'; // 保留相容舊資料
+const POS_KEY='nnjy_pos';
+const LAP_KEY='nnjy_laps';   // 保留不使用
 
-// 當前輪次遍數（與歷史統計分開）
-const CUR_LAP_KEY='nnjy_cur_laps'; // {title: count}
-function loadCurLaps(){try{return JSON.parse(localStorage.getItem(CUR_LAP_KEY)||'{}')}catch{return{}}}
-function saveCurLaps(d){localStorage.setItem(CUR_LAP_KEY,JSON.stringify(d))}
-function getCurLap(title){return loadCurLaps()[title]||0}
-function addCurLap(title){
-  const d=loadCurLaps();
-  d[title]=(d[title]||0)+1;
-  saveCurLaps(d);
-}
-function clearCurLap(title){
-  const d=loadCurLaps();
-  delete d[title];
-  saveCurLaps(d);
-}
 function loadStats(){try{return JSON.parse(localStorage.getItem(STATS_KEY)||'[]')}catch{return[]}}
 function saveStats(d){localStorage.setItem(STATS_KEY,JSON.stringify(d))}
+// 以下為 no-op，保留向後相容
+function loadCurLaps(){return{}}
+function saveCurLaps(d){}
+function getCurLap(title){return 0}
+function addCurLap(title){}
+function clearCurLap(title){}
+
+// 清除遍數（IDB + Firestore）
+async function clearCurLapIDB(title){
+  if(!title)return;
+  if(window._lapsClearTitle) await window._lapsClearTitle(title);
+  if(window._fbUser && window._fbClearLapsCloud)
+    window._fbClearLapsCloud(window._fbUser.uid, title).catch(()=>{});
+  updateLapDisplay(title);
+  renderLib();
+}
 
 // ── 目標遍數 ──
 const GOAL_KEY='nnjy_goals'; // {title: goalCount}
@@ -3154,6 +3531,49 @@ function showGoalFlash(title,total){
     el.style.opacity='0';
     setTimeout(()=>{el.style.display='none';el.style.transition='';},1200);
   },2000);
+}
+
+// 達標後提示「開始新一輪」
+function showNewRoundPrompt(title){
+  document.getElementById('new-round-title').textContent='「'+title+'」已圓滿！';
+  document.getElementById('new-round-overlay').style.display='flex';
+}
+function closeNewRoundPrompt(){
+  document.getElementById('new-round-overlay').style.display='none';
+}
+async function confirmNewRound(){
+  const title=document.getElementById('new-round-title').textContent.replace(/^「|」已圓滿！$/g,'');
+  closeNewRoundPrompt();
+  await doStartNewRound(title);
+}
+function confirmStartNewRoundFromModal(){
+  const title=editingTitle;
+  // 用現有 delete-modal 做確認
+  document.getElementById('delete-modal-title').textContent='「'+title+'」開始新一輪？
+歷史遍數繼續累積';
+  document.getElementById('delete-modal-confirm').textContent='開始新一輪';
+  document.getElementById('delete-modal-confirm').onclick=async()=>{
+    document.getElementById('delete-modal-confirm').textContent='刪除';
+    closeEditModal();
+    closeDeleteModal();
+    await doStartNewRound(title);
+  };
+  document.getElementById('delete-modal-overlay').style.display='flex';
+}
+async function startNewRoundFromModal(){
+  const title=editingTitle;
+  closeEditModal();
+  await doStartNewRound(title);
+}
+async function doStartNewRound(title){
+  if(!title||!window._sessAddNew)return;
+  await window._sessAddNew(title);
+  updateLapDisplay(title);
+  renderLib();
+  showToast('✦ 新一輪開始');
+  markDirty();
+  if(window._fbUser && window._fbSyncSessions)
+    window._fbSyncSessions(window._fbUser.uid,true).catch(()=>{});
 }
 function loadPos(){try{return JSON.parse(localStorage.getItem(POS_KEY)||'{}')}catch{return{}}}
 function savePos(d){localStorage.setItem(POS_KEY,JSON.stringify(d))}
@@ -3366,44 +3786,38 @@ function playGoalSound(){
   }
 }
 
-// 記錄完成一遍
+// 記錄完成一遍（IDB 事件制）
 let _lapSyncTimer = null;
 function recordLap(title){
-  const stats=loadStats();
-  const t=today();
-  const idx=stats.findIndex(s=>s.date===t&&s.title===title);
-  if(idx>=0)stats[idx].laps++;
-  else stats.push({date:t,title,laps:1});
-  saveStats(stats);
-  addCurLap(title); // 當前輪次 +1
-  const curLap=getCurLap(title);
-  updateLapDisplay(title);
-  const goals=loadGoals();
-  const goal=goals[title]||0;
-  if(goal>0&&curLap===goal){
-    const total=stats.filter(s=>s.title===title).reduce((a,b)=>a+b.laps,0);
-    showGoalFlash(title,total);
-    clearCurLap(title); // 圓滿後當前輪次歸零
-    setTimeout(()=>updateLapDisplay(title),2500);
-  }else{
-    showLapFlash(curLap);
-    // 木魚聲邏輯：
-    // - 佛號短咒 + 人聲開啟（循環模式）→ 不播木魚
-    // - 佛號短咒 + 念珠模式 → 不播木魚（念珠已有自己音效）
-    // - 其他情況 → 播木魚
-    const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
-    const usingRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
-    const noWoodfish=(currentCategory==='佛號短咒'&&ttsEnabled)||usingRosary;
-    if(!noWoodfish) playLapSound();
-  }
-  // 停手 10 秒後靜默推送（debounce，避免高頻念佛連續寫入）
-  markDirty();
-  if(window._fbUser){
-    clearTimeout(_lapSyncTimer);
-    _lapSyncTimer=setTimeout(()=>{
-      window._fbPushCloud(window._fbUser.uid, true).then(()=>{ clearDirty(); });
-    }, 10000);
-  }
+  if(!window._lapsAddEvent) return;
+  window._lapsAddEvent(title).then(async () => {
+    const curLap = await window._getCurLapCount(title);
+    updateLapDisplay(title);
+    const goals=loadGoals();
+    const goal=goals[title]||0;
+    if(goal>0 && curLap===goal){
+      showGoalFlash(title, curLap);
+      // 達標後延遲 2.5 秒彈出「開始新一輪」提示
+      setTimeout(()=>showNewRoundPrompt(title), 2500);
+    } else {
+      showLapFlash(curLap);
+      const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
+      const usingRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
+      const noWoodfish=(currentCategory==='佛號短咒'&&ttsEnabled)||usingRosary;
+      if(!noWoodfish) playLapSound();
+    }
+    markDirty();
+    if(window._fbUser){
+      clearTimeout(_lapSyncTimer);
+      _lapSyncTimer=setTimeout(()=>{
+        Promise.all([
+          window._fbSyncLaps(window._fbUser.uid, true),
+          window._fbSyncSessions ? window._fbSyncSessions(window._fbUser.uid, true) : Promise.resolve(),
+        ]).then(()=>clearDirty());
+      }, 10000);
+    }
+    renderLib();
+  });
 }
 
 // 念完一遍大字浮現（只有佛教經典顯示）
@@ -3419,58 +3833,50 @@ function showLapFlash(total){
   setTimeout(()=>{el.style.display='none';},1800);
 }
 
-// 更新閱讀頁遍數顯示
-function confirmClearLap(){
+// 長按 book-lap → 彈出遍數調整 modal
+function openLapAdjustModal(){
   if(!currentTitle)return;
-  document.getElementById('delete-modal-title').textContent='清除「'+currentTitle+'」本輪遍數？';
-  document.getElementById('delete-modal-confirm').onclick=()=>{
-    clearCurLap(currentTitle);
-    updateLapDisplay(currentTitle);
-    closeDeleteModal();
-  };
-  document.getElementById('delete-modal-overlay').style.display='flex';
+  openEditModal(encodeURIComponent(currentTitle));
 }
 
-// 長按 book-lap 清除遍數
 (function(){
   let pressTimer=null;
   const el=document.getElementById('book-lap');
   if(!el)return;
   el.addEventListener('touchstart',()=>{
-    pressTimer=setTimeout(()=>confirmClearLap(),600);
+    pressTimer=setTimeout(()=>openLapAdjustModal(),600);
   },{passive:true});
   el.addEventListener('touchend',()=>clearTimeout(pressTimer),{passive:true});
   el.addEventListener('touchmove',()=>clearTimeout(pressTimer),{passive:true});
-  el.addEventListener('mousedown',()=>{pressTimer=setTimeout(()=>confirmClearLap(),600);});
+  el.addEventListener('mousedown',()=>{pressTimer=setTimeout(()=>openLapAdjustModal(),600);});
   el.addEventListener('mouseup',()=>clearTimeout(pressTimer));
 })();
 
+// 更新閱讀頁遍數顯示（本輪遍數，異步）
 function updateLapDisplay(title){
   if(!title)return;
-  const cur=getCurLap(title); // 當前輪次
   const goals=loadGoals();
   const goal=goals[title]||0;
-  const el=document.getElementById('book-lap');
-  if(!el)return;
-  if(cur>0||goal>0){
-    const reached=goal>0&&cur>=goal;
-    const numColor=reached?'#c8780a':'#8b4513';
-    if(goal>0){
-      el.innerHTML=`<span style="font-size:16px;font-weight:500;color:${numColor}">${cur}</span><br><span style="font-size:9px;color:#9a7a50">/${goal}</span>`;
-    }else{
-      el.innerHTML=`<span style="font-size:20px;font-weight:500;color:${numColor}">${cur}</span><br><span style="font-size:10px;color:#9a7a50;letter-spacing:.05em">遍</span>`;
+  const _render=(cur)=>{
+    const el=document.getElementById('book-lap');
+    if(el){
+      if(cur>0||goal>0){
+        const reached=goal>0&&cur>=goal;
+        const numColor=reached?'#c8780a':'#8b4513';
+        el.innerHTML=goal>0
+          ?`<span style="font-size:16px;font-weight:500;color:${numColor}">${cur}</span><br><span style="font-size:9px;color:#9a7a50">/${goal}</span>`
+          :`<span style="font-size:20px;font-weight:500;color:${numColor}">${cur}</span><br><span style="font-size:10px;color:#9a7a50;letter-spacing:.05em">遍</span>`;
+      }else{
+        el.innerHTML='';
+      }
     }
+    const rc=document.getElementById('reader-lap-count');
+    if(rc) rc.textContent=cur>0?(goal>0?`${cur} / ${goal} 遍`:`第 ${cur} 遍`):'';
+  };
+  if(window._getCurLapCount){
+    window._getCurLapCount(title).then(n=>_render(n));
   }else{
-    el.innerHTML='';
-  }
-  // 同步更新全螢幕遍數
-  const rc=document.getElementById('reader-lap-count');
-  if(rc){
-    if(cur>0){
-      rc.textContent = goal>0 ? `${cur} / ${goal} 遍` : `第 ${cur} 遍`;
-    }else{
-      rc.textContent='';
-    }
+    _render(0);
   }
 }
 // 儲存閱讀位置
@@ -3492,27 +3898,26 @@ function showStatsPage(){
   showPage('stats');
   renderStats();
 }
-function renderStats(){
-  const stats=loadStats();
+async function renderStats(){
   const el=document.getElementById('stats-list');
-  if(!stats.length){el.innerHTML='<div style="text-align:center;color:var(--text3);padding:2rem;font-family:var(--font-main);letter-spacing:.1em">尚無念誦記錄</div>';return;}
+  if(!el)return;
+  el.innerHTML='<div style="text-align:center;color:var(--text3);padding:2rem;font-family:var(--font-main);letter-spacing:.1em">載入中…</div>';
+  // IDB 遍數 + 舊版 localStorage 累加
+  const allEvs=window._lapsGetAll ? await window._lapsGetAll() : [];
   const map={};
-  stats.forEach(s=>{map[s.title]=(map[s.title]||0)+s.laps;});
+  allEvs.forEach(ev=>{ map[ev.title]=(map[ev.title]||0)+1; });
+  loadStats().forEach(s=>{ map[s.title]=(map[s.title]||0)+s.laps; });
+  if(!Object.keys(map).length){
+    el.innerHTML='<div style="text-align:center;color:var(--text3);padding:2rem;font-family:var(--font-main);letter-spacing:.1em">尚無念誦記錄</div>';
+    return;
+  }
   el.innerHTML=Object.entries(map)
     .sort((a,b)=>b[1]-a[1])
     .map(([title,laps])=>`
       <div class="stat-item">
         <div style="flex:1;min-width:0"><div class="stat-title">${title}</div></div>
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <button onclick="adjustLap('${encodeURIComponent(title)}',-1)"
-            style="width:28px;height:28px;border-radius:50%;background:none;
-                   border:1px solid var(--border);color:var(--text2);
-                   font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">−</button>
           <span class="stat-count" id="stat-${encodeURIComponent(title)}">${laps}<small> 遍</small></span>
-          <button onclick="adjustLap('${encodeURIComponent(title)}',1)"
-            style="width:28px;height:28px;border-radius:50%;background:none;
-                   border:1px solid var(--accent);color:var(--accent);
-                   font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">＋</button>
           <button onclick="confirmDeleteStat('${encodeURIComponent(title)}')"
             style="width:28px;height:28px;border-radius:50%;background:none;
                    border:1px solid var(--border2);color:var(--text3);
@@ -3523,54 +3928,37 @@ function renderStats(){
 
 function confirmDeleteStat(encodedTitle){
   const title=decodeURIComponent(encodedTitle);
-  document.getElementById('delete-modal-title').textContent='刪除「'+title+'」的念誦記錄？';
-  document.getElementById('delete-modal-confirm').onclick=()=>{
-    const stats=loadStats().filter(s=>s.title!==title);
-    saveStats(stats);
+  document.getElementById('delete-modal-title').textContent='刪除「'+title+'」的全部念誦記錄？';
+  document.getElementById('delete-modal-confirm').onclick=async()=>{
+    if(window._lapsClearTitle) await window._lapsClearTitle(title);
+    saveStats(loadStats().filter(s=>s.title!==title));
+    if(window._fbUser && window._fbClearLapsCloud)
+      window._fbClearLapsCloud(window._fbUser.uid, title).catch(()=>{});
     updateLapDisplay(title);
     closeDeleteModal();
     renderStats();
+    renderLib();
   };
   document.getElementById('delete-modal-overlay').style.display='flex';
 }
 
 function confirmClearAllStats(){
   document.getElementById('delete-modal-title').textContent='清除所有念誦記錄？';
-  document.getElementById('delete-modal-confirm').onclick=()=>{
+  document.getElementById('delete-modal-confirm').onclick=async()=>{
+    const all=window._lapsGetAll ? await window._lapsGetAll() : [];
+    const titles=[...new Set(all.map(e=>e.title))];
+    for(const t of titles){
+      if(window._lapsClearTitle) await window._lapsClearTitle(t);
+      if(window._fbUser && window._fbClearLapsCloud)
+        window._fbClearLapsCloud(window._fbUser.uid, t).catch(()=>{});
+    }
     saveStats([]);
-    if(currentTitle)updateLapDisplay(currentTitle);
+    if(currentTitle) updateLapDisplay(currentTitle);
     closeDeleteModal();
     renderStats();
+    renderLib();
   };
   document.getElementById('delete-modal-overlay').style.display='flex';
-}
-
-function adjustLap(encodedTitle, delta){
-  const title=decodeURIComponent(encodedTitle);
-  const stats=loadStats();
-  const t=today();
-  if(delta>0){
-    const idx=stats.findIndex(s=>s.date===t&&s.title===title);
-    if(idx>=0)stats[idx].laps++;
-    else stats.push({date:t,title,laps:1});
-    playLapSound();
-  }else{
-    let remain=1;
-    for(let i=stats.length-1;i>=0&&remain>0;i--){
-      if(stats[i].title===title){
-        if(stats[i].laps>remain){stats[i].laps-=remain;remain=0;}
-        else{remain-=stats[i].laps;stats.splice(i,1);}
-      }
-    }
-    if(remain>0)return;
-    playMinusSound();
-  }
-  saveStats(stats);
-  updateLapDisplay(title);
-  const map={};
-  loadStats().forEach(s=>{map[s.title]=(map[s.title]||0)+s.laps;});
-  const el=document.getElementById('stat-'+encodedTitle);
-  if(el)el.innerHTML=(map[title]||0)+'<small> 遍</small>';
 }
 
 // ── 日曆 ──
@@ -3579,10 +3967,16 @@ function showCalendarPage(){
   showPage('calendar');
   renderCalendar();
 }
-function renderCalendar(){
-  const stats=loadStats();
+async function renderCalendar(){
+  // IDB 事件 + 舊版 localStorage stats
+  const allEvs=window._lapsGetAll ? await window._lapsGetAll() : [];
   const recordDates={};
-  stats.forEach(s=>{
+  allEvs.forEach(ev=>{
+    const ds=new Date(ev.timestamp).toISOString().slice(0,10);
+    if(!recordDates[ds])recordDates[ds]={};
+    recordDates[ds][ev.title]=(recordDates[ds][ev.title]||0)+1;
+  });
+  loadStats().forEach(s=>{
     if(!recordDates[s.date])recordDates[s.date]={};
     recordDates[s.date][s.title]=(recordDates[s.date][s.title]||0)+s.laps;
   });
@@ -3609,11 +4003,14 @@ document.getElementById('cal-next').addEventListener('click',()=>{
   calMonth++;if(calMonth>11){calMonth=0;calYear++;}renderCalendar();
 });
 
-function openDayModal(dateStr){
-  const stats=loadStats().filter(s=>s.date===dateStr);
-  if(!stats.length)return;
+async function openDayModal(dateStr){
+  const allEvs=window._lapsGetAll ? await window._lapsGetAll() : [];
   const map={};
-  stats.forEach(s=>{map[s.title]=(map[s.title]||0)+s.laps;});
+  allEvs.filter(ev=>new Date(ev.timestamp).toISOString().slice(0,10)===dateStr)
+    .forEach(ev=>{map[ev.title]=(map[ev.title]||0)+1;});
+  // 兼容舊版
+  loadStats().filter(s=>s.date===dateStr).forEach(s=>{map[s.title]=(map[s.title]||0)+s.laps;});
+  if(!Object.keys(map).length)return;
   const [y,m,d]=dateStr.split('-');
   document.getElementById('day-modal-title').textContent=`${y} 年 ${parseInt(m)} 月 ${parseInt(d)} 日`;
   document.getElementById('day-modal-list').innerHTML=
@@ -4068,6 +4465,8 @@ if(window.matchMedia('(display-mode: standalone)').matches||
 if('serviceWorker' in navigator && location.protocol !== 'file:'){
   window.addEventListener('load', ()=>{
     navigator.serviceWorker.register('./sw.js').catch(()=>{});
+    // 啟動時預載音頻 manifest（用於版本比對）
+    fetchAudioManifest();
   });
 }
 
@@ -4150,7 +4549,11 @@ async function doSync(){
   const btn = document.getElementById('sync-btn');
   if(btn){ btn.textContent='同步中…'; btn.disabled=true; }
   try {
-    await window._fbPushCloud(user.uid);
+    await Promise.all([
+      window._fbPushCloud(user.uid),
+      window._fbSyncLaps ? window._fbSyncLaps(user.uid) : Promise.resolve(),
+      window._fbSyncSessions ? window._fbSyncSessions(user.uid) : Promise.resolve(),
+    ]);
     clearDirty();
   } finally {
     if(btn){ btn.textContent='✦ 立即同步'; btn.disabled=false; }
