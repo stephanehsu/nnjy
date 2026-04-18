@@ -1907,49 +1907,52 @@ body.reader-fullscreen #book-left{
 </div>
 
 <!-- 編輯歷史累積遍數 Modal -->
-<div id="edit-modal-overlay" onclick="handleEditOverlayClick(event)" style="position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:1.5rem;writing-mode:horizontal-tb">
-  <div id="edit-modal" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;width:100%;max-width:320px;overflow:hidden;animation:fadeIn .25s ease">
-    <div class="modal-header">
-      <h3>✦ 修改歷史遍數</h3>
-      <button class="close-btn" onclick="closeEditModal()">✕</button>
+<div id="edit-modal-overlay" onclick="handleEditOverlayClick(event)"
+  style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.6);
+         align-items:center;justify-content:center;padding:1.5rem;writing-mode:horizontal-tb">
+  <div id="edit-modal" style="background:var(--bg);border:2px solid var(--border);border-radius:8px;
+              width:100%;max-width:320px;padding:1.5rem;animation:fadeIn .25s ease">
+    <div style="font-family:var(--font-main);font-size:15px;color:var(--text);
+                letter-spacing:.1em;margin-bottom:.75rem" id="edit-lap-title"></div>
+
+    <div style="font-size:11px;color:var(--accent);letter-spacing:.12em;margin-bottom:.4rem;font-family:var(--font-main)">歷史累積遍數</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;font-family:var(--font-main);line-height:1.6">
+      所有時間念誦的總遍數，不受本輪歸零影響
     </div>
-    <div class="modal-body">
-      <div style="text-align:center;margin-bottom:6px">
-        <div id="edit-lap-title" style="font-size:14px;color:var(--text);letter-spacing:.1em"></div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:12px;line-height:1.6;font-family:var(--font-main)">
-        歷史累積遍數：所有時間念誦的總遍數
-      </div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin:12px 0">
-        <button onclick="editLapAdjust(-1)"
-          style="width:48px;height:48px;border-radius:50%;background:transparent;
-                 border:2px solid var(--border2);color:var(--text2);font-size:24px;
-                 cursor:pointer;font-family:var(--font-main)">−</button>
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:.6rem">
+      <button onclick="editLapAdjust(-1)"
+        style="width:40px;height:40px;border-radius:50%;background:transparent;
+               border:2px solid var(--border2);color:var(--text2);font-size:22px;
+               cursor:pointer;font-family:var(--font-main);display:flex;align-items:center;justify-content:center">−</button>
+      <div style="text-align:center;min-width:64px">
         <input type="number" id="edit-lap-input" min="0"
-          style="width:80px;text-align:center;font-size:28px;font-weight:700;
+          style="width:72px;text-align:center;font-size:28px;font-weight:700;
                  color:var(--accent);background:var(--bg3);border:1px solid var(--border);
                  border-radius:6px;padding:6px;font-family:var(--font-main);
                  -webkit-appearance:none;-moz-appearance:textfield">
-        <button onclick="editLapAdjust(1)"
-          style="width:48px;height:48px;border-radius:50%;background:transparent;
-                 border:2px solid var(--border2);color:var(--text2);font-size:24px;
-                 cursor:pointer;font-family:var(--font-main)">+</button>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--font-main);margin-top:2px">遍</div>
       </div>
-      <div style="text-align:center;font-size:11px;color:var(--text3);margin-bottom:16px">遍</div>
-      <div style="display:flex;gap:8px">
-        <button onclick="closeEditModal()"
-          style="flex:1;min-height:44px;border-radius:4px;background:transparent;
-                 border:1px solid var(--border);color:var(--text2);
-                 font-family:var(--font-main);font-size:14px;letter-spacing:.1em;cursor:pointer">
-          取消
-        </button>
-        <button onclick="confirmEditLap()"
-          style="flex:1;min-height:44px;border-radius:4px;background:transparent;
-                 border:1px solid var(--accent);color:var(--accent);
-                 font-family:var(--font-main);font-size:14px;letter-spacing:.1em;cursor:pointer">
-          儲存
-        </button>
-      </div>
+      <button onclick="editLapAdjust(1)"
+        style="width:40px;height:40px;border-radius:50%;background:transparent;
+               border:2px solid var(--border2);color:var(--text2);font-size:22px;
+               cursor:pointer;font-family:var(--font-main);display:flex;align-items:center;justify-content:center">+</button>
+    </div>
+
+    <div style="border-top:1px solid var(--border2);margin:.9rem 0"></div>
+
+    <div style="display:flex;gap:10px">
+      <button onclick="closeEditModal()"
+        style="flex:1;height:44px;border-radius:4px;background:none;
+               border:1px solid var(--border);color:var(--text2);
+               font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
+        取消
+      </button>
+      <button onclick="confirmEditLap()"
+        style="flex:1;height:44px;border-radius:4px;background:var(--accent);
+               border:none;color:#f5edd8;
+               font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
+        儲存
+      </button>
     </div>
   </div>
 </div>
@@ -3028,10 +3031,12 @@ function buildPages(onDone){
   });
 }
 
+let _pageRenderToken=0; // 每次換頁產生新 token，舊的 setTimeout 檢查 token 決定是否放棄
 function showPage_num(p,noAnim){
   if(!pages.length)return;
   p=Math.max(0,Math.min(p,pages.length-1));
   currentPage=p;
+  _pageRenderToken++; // 讓任何進行中的舊 setTimeout render 失效
   const pg=document.getElementById('book-page-num');
   if(pg)pg.textContent=p+1;
   const pi=document.getElementById('page-indicator');
@@ -3123,8 +3128,10 @@ function showPage_num(p,noAnim){
     if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
     return;
   }
+  const myToken=_pageRenderToken;
   c.style.transition='opacity .2s';c.style.opacity='0';
   setTimeout(()=>{
+    if(_pageRenderToken!==myToken)return; // 已被更新的換頁取代，放棄
     doRender();
     c.style.opacity='1';
     if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
@@ -3186,7 +3193,7 @@ function rebuildPages(){
 // ── 高亮 ──
 function updateHighlight(){
   const p=sentencePageMap[currentIdx]??0;
-  if(p!==currentPage){showPage_num(p);updateProgress();return;}
+  if(p!==currentPage){showPage_num(p,true);updateProgress();return;}
   document.querySelectorAll('.sentence').forEach(sp=>{
     const i=parseInt(sp.dataset.idx);
     sp.classList.remove('active','passed');
