@@ -166,10 +166,10 @@ window._lapsDeleteByIds = async function(lapIds) {
 window._fbSignIn = () => {
   signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
     if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request')
-      showToast('登入失敗：' + (e.code || e.message));
+      if(typeof showToast==="function")showToast('登入失敗：' + (e.code || e.message));
   });
 };
-window._fbSignOut = async () => { await signOut(auth); showToast('已登出'); };
+window._fbSignOut = async () => { await signOut(auth); if(typeof showToast==="function")showToast('已登出'); };
 
 document.addEventListener('DOMContentLoaded', () => {
   const loginBtn = document.getElementById('btn-google-login');
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loginBtn.addEventListener('click', () => {
       signInWithPopup(auth, window._fbGoogleProvider).catch(e => {
         if(e.code !== 'auth/popup-closed-by-user' && e.code !== 'auth/cancelled-popup-request')
-          showToast('登入失敗：' + (e.code || e.message));
+          if(typeof showToast==="function")showToast('登入失敗：' + (e.code || e.message));
       });
     });
   }
@@ -205,7 +205,7 @@ function stopAutoSync() { if(_autoSyncTimer) { clearInterval(_autoSyncTimer); _a
 window.addEventListener('online', () => {
   if(window._fbUser && _isDirty) {
     Promise.all([_fbSyncLaps(window._fbUser.uid, true), _fbPushCloud(window._fbUser.uid, true), _fbSyncSessions(window._fbUser.uid, true)])
-      .then(() => { clearDirty(); showToast('✦ 網路已恢復，資料已同步'); });
+      .then(() => { clearDirty(); if(typeof showToast==="function")showToast('✦ 網路已恢復，資料已同步'); });
   }
 });
 
@@ -226,11 +226,11 @@ async function _fbSyncLaps(uid, silent=false) {
       await batch.commit();
       await window._lapsMarkSynced(chunk.map(e => e.lapId));
     }
-    if(!silent) showToast('✦ 遍數已同步到雲端');
+    if(!silent) if(typeof showToast==="function")showToast('✦ 遍數已同步到雲端');
     localStorage.setItem('nnjy_syncTs', Date.now());
     if(typeof updateSyncLastTime === 'function') updateSyncLastTime();
   } catch(e) {
-    if(!silent) showToast('遍數同步失敗：' + e.message);
+    if(!silent) if(typeof showToast==="function")showToast('遍數同步失敗：' + e.message);
   }
 }
 window._fbSyncLaps = _fbSyncLaps;
@@ -262,7 +262,7 @@ async function _fbPullLaps(uid) {
     const affectedTitles = [...new Set(toAdd.map(e => e.title))];
     for(const t of affectedTitles) if(typeof updateLapDisplay === 'function') updateLapDisplay(t);
     if(typeof renderLib === 'function') renderLib();
-    showToast('✦ 雲端遍數記錄已載入');
+    if(typeof showToast==="function")showToast('✦ 雲端遍數記錄已載入');
   } catch(e) { console.error('拉取遍數失敗', e); }
 }
 
@@ -449,10 +449,10 @@ window._fbPushCloud = async (uid, silent=false) => {
   if(!uid) return;
   try {
     await setDoc(doc(db, 'users', uid, 'data', 'main'), { ..._collectLocalData(), _updatedAt: serverTimestamp() });
-    if(!silent) showToast('✦ 已同步到雲端');
+    if(!silent) if(typeof showToast==="function")showToast('✦ 已同步到雲端');
     localStorage.setItem('nnjy_syncTs', Date.now());
     if(typeof updateSyncLastTime === 'function') updateSyncLastTime();
-  } catch(e) { if(!silent) showToast('同步失敗：' + e.message); }
+  } catch(e) { if(!silent) if(typeof showToast==="function")showToast('同步失敗：' + e.message); }
 };
 const _fbPushCloud = window._fbPushCloud;
 
@@ -472,7 +472,7 @@ window._fbPullCloud = async (uid) => {
     localStorage.setItem('nnjy_goals', JSON.stringify(goals || {}));
     localStorage.setItem('nnjy_localTs', Date.now());
     if(typeof renderLib === 'function') renderLib();
-    showToast('✦ 雲端資料已載入');
+    if(typeof showToast==="function")showToast('✦ 雲端資料已載入');
   } catch(e) { console.error('拉取失敗', e); }
   await _fbPullLaps(uid);
   _fbPullSessions(uid);
@@ -483,7 +483,7 @@ let _isFirstAuth = true;
 onAuthStateChanged(auth, user => {
   const wasNull = !window._fbUser;
   window._fbUser = user || null;
-  updateSyncUI(user);
+  if(typeof updateSyncUI === "function") updateSyncUI(user);
   if(user) {
     if(_isFirstAuth || wasNull) window._fbPullCloud(user.uid);
     startAutoSync();
@@ -1721,7 +1721,7 @@ body.reader-fullscreen #book-left{
         id="sync-btn">
         ✦ 立即同步
       </button>
-      <button onclick="window._fbSignOut&&window._fbSignOut()"
+      <button onclick="if(window._fbSignOut)window._fbSignOut()"
         style="width:100%;min-height:40px;border-radius:4px;
                background:transparent;border:1px solid var(--border2);
                color:var(--text3);font-family:var(--font-main);
@@ -3549,8 +3549,7 @@ async function confirmNewRound(){
 function confirmStartNewRoundFromModal(){
   const title=editingTitle;
   // 用現有 delete-modal 做確認
-  document.getElementById('delete-modal-title').textContent='「'+title+'」開始新一輪？
-歷史遍數繼續累積';
+  document.getElementById('delete-modal-title').textContent='「'+title+'」開始新一輪？\n歷史遍數繼續累積';
   document.getElementById('delete-modal-confirm').textContent='開始新一輪';
   document.getElementById('delete-modal-confirm').onclick=async()=>{
     document.getElementById('delete-modal-confirm').textContent='刪除';
