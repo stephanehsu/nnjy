@@ -717,7 +717,56 @@ body.reader-fullscreen #book-left{
   color:#7a5a3a;
   writing-mode:horizontal-tb;
   padding-bottom:2px;
+  cursor:pointer;
+  user-select:none;-webkit-user-select:none;
+  transition:color .15s;
 }
+#book-page-num:active{color:var(--accent)}
+
+/* 翻頁滾輪面板 */
+#page-roller-overlay{
+  display:none;position:fixed;inset:0;z-index:480;
+}
+#page-roller{
+  position:fixed;left:0;bottom:0;top:0;
+  width:52px;
+  background:rgba(30,16,4,0.92);
+  border-right:1px solid rgba(139,104,64,0.4);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  display:flex;flex-direction:column;
+  z-index:481;
+  writing-mode:horizontal-tb;
+  animation:slideInLeft .2s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes slideInLeft{
+  from{transform:translateX(-100%)}
+  to{transform:translateX(0)}
+}
+#page-roller-list{
+  flex:1;overflow-y:auto;
+  padding:8px 0;
+  -webkit-overflow-scrolling:touch;
+}
+#page-roller-list::-webkit-scrollbar{width:2px}
+#page-roller-list::-webkit-scrollbar-thumb{background:rgba(139,104,64,0.4);border-radius:1px}
+.page-roller-item{
+  width:100%;height:36px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-main);font-size:13px;
+  color:#c8a870;cursor:pointer;
+  transition:background .15s,color .15s;
+  letter-spacing:.05em;
+  flex-shrink:0;
+}
+.page-roller-item:active,.page-roller-item:hover{background:rgba(139,104,64,0.25);color:#f0d080}
+.page-roller-item.current{color:var(--accent);font-weight:700;background:rgba(200,120,10,0.15)}
+#page-roller-close{
+  flex-shrink:0;height:44px;
+  display:flex;align-items:center;justify-content:center;
+  border-top:1px solid rgba(139,104,64,0.3);
+  color:#7a5a3a;font-size:18px;cursor:pointer;
+}
+#page-roller-close:active{color:#c8a870}
 
 /* 右側方框 */
 #book-frame{
@@ -729,6 +778,34 @@ body.reader-fullscreen #book-left{
   display:flex;
   position:relative;
 }
+/* 翻頁滾輪效果 */
+#reading-area{
+  perspective:1200px;
+}
+#text-container{
+  transform-origin:center center;
+  backface-visibility:hidden;
+}
+@keyframes pageSlideInRight{
+  from{transform:translateX(60%) rotateY(-18deg);opacity:0}
+  to{transform:translateX(0) rotateY(0deg);opacity:1}
+}
+@keyframes pageSlideInLeft{
+  from{transform:translateX(-60%) rotateY(18deg);opacity:0}
+  to{transform:translateX(0) rotateY(0deg);opacity:1}
+}
+@keyframes pageSlideInDown{
+  from{transform:translateY(-40%) rotateX(12deg);opacity:0}
+  to{transform:translateY(0) rotateX(0deg);opacity:1}
+}
+@keyframes pageSlideInUp{
+  from{transform:translateY(40%) rotateX(-12deg);opacity:0}
+  to{transform:translateY(0) rotateX(0deg);opacity:1}
+}
+.page-anim-next-vert #text-container{animation:pageSlideInRight .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+.page-anim-prev-vert #text-container{animation:pageSlideInLeft .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+.page-anim-next-horiz #text-container{animation:pageSlideInDown .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+.page-anim-prev-horiz #text-container{animation:pageSlideInUp .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
 
 /* 左右跳頁箭頭區 */
 .page-zone{
@@ -771,7 +848,7 @@ body.reader-fullscreen #book-left{
   text-orientation:mixed;
   width:100%;height:100%;
   font-family:var(--font-main);
-  font-size:25px;line-height:2.2;
+  font-size:30px;line-height:2;
   color:#2a1a0a;
   white-space:pre-wrap;word-break:break-all;
   text-align:justify;
@@ -1378,7 +1455,7 @@ body.reader-fullscreen #book-left{
           title="長按清除遍數"
           oncontextmenu="event.preventDefault();confirmClearLap()"
         ></div>
-        <div id="book-page-num">1</div>
+        <div id="book-page-num" onclick="openPageRoller()" title="點擊選頁">1</div>
       </div>
       <div id="book-frame">
         <!-- 左箭頭（下一頁，直排往左） -->
@@ -1485,6 +1562,13 @@ body.reader-fullscreen #book-left{
   </div>
 </div>
 
+<!-- 翻頁滾輪 -->
+<div id="page-roller-overlay" onclick="closePageRoller()"></div>
+<div id="page-roller" style="display:none">
+  <div id="page-roller-list"></div>
+  <div id="page-roller-close" onclick="closePageRoller()">✕</div>
+</div>
+
 <!-- 遍數浮現動畫 -->
 <div id="lap-flash"></div>
 
@@ -1502,7 +1586,7 @@ body.reader-fullscreen #book-left{
       開始新一輪？<br>歷史遍數繼續累積
     </div>
     <div style="display:flex;gap:10px">
-      <button onclick="closeNewRoundPrompt()"
+      <button onclick="dismissNewRound()"
         style="flex:1;min-height:44px;border-radius:4px;background:transparent;
                border:1px solid var(--border);color:var(--text2);
                font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
@@ -1596,7 +1680,7 @@ body.reader-fullscreen #book-left{
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--border);color:var(--text2);
                font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">－</button>
-      <span id="fs-val" style="font-family:var(--font-main);font-size:16px;color:var(--text);min-width:48px;text-align:center;letter-spacing:.05em">25px</span>
+      <span id="fs-val" style="font-family:var(--font-main);font-size:16px;color:var(--text);min-width:48px;text-align:center;letter-spacing:.05em">30px</span>
       <button onclick="adjustFontSize(1)"
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--accent);color:var(--accent);
@@ -1619,7 +1703,7 @@ body.reader-fullscreen #book-left{
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--border);color:var(--text2);
                font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">－</button>
-      <span id="lh-val" style="font-family:var(--font-main);font-size:16px;color:var(--text);min-width:48px;text-align:center;letter-spacing:.05em">2.2</span>
+      <span id="lh-val" style="font-family:var(--font-main);font-size:16px;color:var(--text);min-width:48px;text-align:center;letter-spacing:.05em">2.0</span>
       <button onclick="adjustLineHeight(0.1)"
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--accent);color:var(--accent);
@@ -3031,16 +3115,23 @@ function buildPages(onDone){
   });
 }
 
-let _pageRenderToken=0; // 每次換頁產生新 token，舊的 setTimeout 檢查 token 決定是否放棄
+let _pageRenderToken=0;
+let _lastPageForAnim=0; // 記錄上次頁碼以判斷翻頁方向
 function showPage_num(p,noAnim){
   if(!pages.length)return;
   p=Math.max(0,Math.min(p,pages.length-1));
+  const direction = p > _lastPageForAnim ? 'next' : (p < _lastPageForAnim ? 'prev' : null);
+  _lastPageForAnim=p;
   currentPage=p;
-  _pageRenderToken++; // 讓任何進行中的舊 setTimeout render 失效
+  _pageRenderToken++;
   const pg=document.getElementById('book-page-num');
-  if(pg)pg.textContent=p+1;
+  if(pg)pg.textContent=(p+1)+' / '+pages.length;
   const pi=document.getElementById('page-indicator');
   if(pi)pi.textContent=(p+1)+' / '+pages.length;
+  // 更新滾輪 current 標記（若已開啟）
+  document.querySelectorAll('.page-roller-item').forEach(el=>{
+    el.classList.toggle('current',parseInt(el.dataset.page)===p);
+  });
   const c=document.getElementById('text-container');
   const area=document.getElementById('reading-area');
   const isVert=c.style.writingMode!=='horizontal-tb';
@@ -3129,13 +3220,26 @@ function showPage_num(p,noAnim){
     return;
   }
   const myToken=_pageRenderToken;
-  c.style.transition='opacity .2s';c.style.opacity='0';
+  const isVert2=c.style.writingMode!=='horizontal-tb';
+  // 先淡出
+  c.style.transition='opacity .12s';c.style.opacity='0';
   setTimeout(()=>{
-    if(_pageRenderToken!==myToken)return; // 已被更新的換頁取代，放棄
+    if(_pageRenderToken!==myToken)return;
     doRender();
+    // 加方向動畫 class
+    const area2=document.getElementById('reading-area');
+    area2.classList.remove('page-anim-next-vert','page-anim-prev-vert','page-anim-next-horiz','page-anim-prev-horiz');
+    if(direction){
+      const cls = isVert2
+        ? (direction==='next' ? 'page-anim-next-vert' : 'page-anim-prev-vert')
+        : (direction==='next' ? 'page-anim-next-horiz' : 'page-anim-prev-horiz');
+      void area2.offsetWidth; // reflow
+      area2.classList.add(cls);
+      setTimeout(()=>area2.classList.remove(cls), 320);
+    }
     c.style.opacity='1';
     if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
-  },200);
+  },120);
 }
 
 function renderPage(){
@@ -3383,8 +3487,8 @@ function setDirection(dir){
 }
 // 字體大小範圍
 const FS_MIN=14,FS_MAX=40;
-let _fontSize=25;
-let _lineHeight=2.2;
+let _fontSize=30;
+let _lineHeight=2;
 let _rebuildTimer=null;
 
 function adjustFontSize(delta){
@@ -3630,17 +3734,37 @@ function showGoalFlash(title,total){
 }
 
 // 達標後提示「開始新一輪」
+let _newRoundWasPlaying=false; // 記錄提示前是否在念誦
 function showNewRoundPrompt(title){
+  _newRoundWasPlaying=isPlaying; // 已在 recordLap 停止念誦，此時 isPlaying=false
   document.getElementById('new-round-title').textContent='「'+title+'」已圓滿！';
   document.getElementById('new-round-overlay').style.display='flex';
 }
 function closeNewRoundPrompt(){
   document.getElementById('new-round-overlay').style.display='none';
 }
+// 稍後再說：跳第一頁，念誦維持停止
+function dismissNewRound(){
+  closeNewRoundPrompt();
+  currentIdx=0;currentPage=-1;
+  showPage_num(0,false);
+  updateProgress();
+  syncAudioToCurrentIdx();
+  updateLapBtn();
+}
+// 開始新一輪：新 session + 跳第一頁 + 若原本在念誦則重啟
 async function confirmNewRound(){
   const title=document.getElementById('new-round-title').textContent.replace(/^「|」已圓滿！$/g,'');
   closeNewRoundPrompt();
   await doStartNewRound(title);
+  // 跳回第一頁
+  currentIdx=0;currentPage=-1;
+  showPage_num(0,false);
+  updateProgress();
+  syncAudioToCurrentIdx();
+  updateLapBtn();
+  // 重啟念誦
+  if(_newRoundWasPlaying) startChant();
 }
 function confirmStartNewRoundFromModal(){
   const title=editingTitle;
@@ -3891,15 +4015,24 @@ function recordLap(title){
     const goals=loadGoals();
     const goal=goals[title]||0;
     if(goal>0 && curLap===goal){
+      // 達標：播鐘聲，停留在最後一頁，停下念誦，延遲 2.5 秒後彈詢問
       showGoalFlash(title, curLap);
-      // 達標後延遲 2.5 秒彈出「開始新一輪」提示
+      if(isPlaying) stopChant(); // 停止念誦，等使用者回答
       setTimeout(()=>showNewRoundPrompt(title), 2500);
+      // 不跳回第一頁，留在最後一頁
     } else {
+      // 未達標：播木魚，跳回第一頁繼續
       showLapFlash(curLap);
       const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
       const usingRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
       const noWoodfish=(currentCategory==='佛號短咒'&&ttsEnabled)||usingRosary;
       if(!noWoodfish) playLapSound();
+      // 跳回第一頁
+      currentIdx=0;currentPage=-1;
+      showPage_num(0,false);
+      updateProgress();
+      syncAudioToCurrentIdx();
+      updateLapBtn();
     }
     markDirty();
     if(window._fbUser){
@@ -3974,6 +4107,42 @@ function updateLapDisplay(title){
     _render(0);
   }
 }
+// ── 翻頁滾輪 ──
+function openPageRoller(){
+  if(!pages.length)return;
+  const list=document.getElementById('page-roller-list');
+  list.innerHTML='';
+  for(let i=0;i<pages.length;i++){
+    const div=document.createElement('div');
+    div.className='page-roller-item'+(i===currentPage?' current':'');
+    div.textContent=i+1;
+    div.dataset.page=i;
+    div.addEventListener('click',()=>{
+      closePageRoller();
+      if(i!==currentPage){
+        const pg=pages[i];
+        if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
+        showPage_num(i,false);
+        updateProgress();
+        syncAudioToCurrentIdx();
+        updateLapBtn();
+      }
+    });
+    list.appendChild(div);
+  }
+  document.getElementById('page-roller-overlay').style.display='block';
+  document.getElementById('page-roller').style.display='flex';
+  // 滾動到目前頁
+  requestAnimationFrame(()=>{
+    const cur=list.querySelector('.current');
+    if(cur) cur.scrollIntoView({block:'center',behavior:'instant'});
+  });
+}
+function closePageRoller(){
+  document.getElementById('page-roller-overlay').style.display='none';
+  document.getElementById('page-roller').style.display='none';
+}
+
 // 儲存閱讀位置
 function saveReadPos(title,pageIdx,sentIdx){
   if(!title)return;
@@ -4485,16 +4654,12 @@ function sentencePageMap2sentIdx(offset){
 document.getElementById('btn-manual-lap').addEventListener('click',function(e){
   e.stopPropagation();
   if(!currentTitle)return;
+  // recordLap 內部已播音效，不再重複播
   recordLap(currentTitle);
-  playLapSound();
   this.style.transform='scale(1.2)';
   setTimeout(()=>{this.style.transform='';},180);
-  // 跳回第一頁第一句
-  currentIdx=0;currentPage=-1;
-  showPage_num(0,false);
-  updateProgress();
-  syncAudioToCurrentIdx();
-  updateLapBtn(); // 跳回第一頁後隱藏+1按鈕
+  // 注意：跳回第一頁的時機由 recordLap 的 promise 回調控制
+  // 若未達標就直接跳；達標則等 showNewRoundPrompt 後再跳
 });
 document.getElementById('page-prev-zone').addEventListener('click',function(e){
   e.stopPropagation();
