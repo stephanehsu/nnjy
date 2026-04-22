@@ -786,26 +786,7 @@ body.reader-fullscreen #book-left{
   transform-origin:center center;
   backface-visibility:hidden;
 }
-@keyframes pageSlideInRight{
-  from{transform:translateX(60%) rotateY(-18deg);opacity:0}
-  to{transform:translateX(0) rotateY(0deg);opacity:1}
-}
-@keyframes pageSlideInLeft{
-  from{transform:translateX(-60%) rotateY(18deg);opacity:0}
-  to{transform:translateX(0) rotateY(0deg);opacity:1}
-}
-@keyframes pageSlideInDown{
-  from{transform:translateY(-40%) rotateX(12deg);opacity:0}
-  to{transform:translateY(0) rotateX(0deg);opacity:1}
-}
-@keyframes pageSlideInUp{
-  from{transform:translateY(40%) rotateX(-12deg);opacity:0}
-  to{transform:translateY(0) rotateX(0deg);opacity:1}
-}
-.page-anim-next-vert #text-container{animation:pageSlideInRight .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
-.page-anim-prev-vert #text-container{animation:pageSlideInLeft .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
-.page-anim-next-horiz #text-container{animation:pageSlideInDown .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
-.page-anim-prev-horiz #text-container{animation:pageSlideInUp .28s cubic-bezier(0.25,0.46,0.45,0.94) forwards}
+
 
 /* 左右跳頁箭頭區 */
 .page-zone{
@@ -3220,26 +3201,13 @@ function showPage_num(p,noAnim){
     return;
   }
   const myToken=_pageRenderToken;
-  const isVert2=c.style.writingMode!=='horizontal-tb';
-  // 先淡出
-  c.style.transition='opacity .12s';c.style.opacity='0';
+  c.style.transition='opacity .2s';c.style.opacity='0';
   setTimeout(()=>{
     if(_pageRenderToken!==myToken)return;
     doRender();
-    // 加方向動畫 class
-    const area2=document.getElementById('reading-area');
-    area2.classList.remove('page-anim-next-vert','page-anim-prev-vert','page-anim-next-horiz','page-anim-prev-horiz');
-    if(direction){
-      const cls = isVert2
-        ? (direction==='next' ? 'page-anim-next-vert' : 'page-anim-prev-vert')
-        : (direction==='next' ? 'page-anim-next-horiz' : 'page-anim-prev-horiz');
-      void area2.offsetWidth; // reflow
-      area2.classList.add(cls);
-      setTimeout(()=>area2.classList.remove(cls), 320);
-    }
     c.style.opacity='1';
     if(currentTitle) saveReadPos(currentTitle,currentPage,currentIdx);
-  },120);
+  },200);
 }
 
 function renderPage(){
