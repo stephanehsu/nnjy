@@ -2872,7 +2872,7 @@ function startAudioPoll(){
     if(idx<0){
       for(let i=0;i<sutraTimeline.length-1;i++){
         const gap=sutraTimeline[i+1].start-sutraTimeline[i].end;
-        const mid=sutraTimeline[i].end+gap*0.5;
+        const mid=sutraTimeline[i].end+gap*0.1;
         if(t>=mid&&t<sutraTimeline[i+1].start){
           idx=i+1; break;
         }
@@ -3392,9 +3392,8 @@ function speak(text, onDone){
 
 // ── 速度分段 ──
 function calcDelay(){
+  if(ttsEnabled) return 30;
   const s=stripBold(sentences[currentIdx]||'');
-  const endsWithPunct=/[。！？；～.．…，、：—」』】）\]]+$/.test(s);
-  if(ttsEnabled && endsWithPunct) return 50;
   const n=Math.max(1,s.replace(/[^\u4e00-\u9fff\u3400-\u4dbfa-zA-Z0-9]/g,'').length);
   return n*chantSpeed;
 }
