@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.2</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.3</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1445,7 +1445,7 @@ body.reader-fullscreen #book-left{
         </div>
         <div id="reading-area">
           <div id="text-container"></div>
-          <div id="page-indicator" onclick="openPageRoller()" style="position:absolute;bottom:6px;left:10px;font-size:11px;color:rgba(42,26,10,.55);font-family:var(--font-main);letter-spacing:.05em;writing-mode:horizontal-tb;pointer-events:auto;z-index:10;cursor:pointer;padding:4px 6px 4px 4px;border-radius:4px;transition:color .15s" title="點擊選頁">1 / 1</div>
+          <div id="page-indicator" onclick="openPageRoller()" style="position:absolute;bottom:8px;left:8px;font-size:12px;color:#8b5e2a;font-family:var(--font-main);letter-spacing:.05em;writing-mode:horizontal-tb;pointer-events:auto;z-index:10;cursor:pointer;padding:5px 9px;border-radius:6px;transition:background .15s,color .15s;background:rgba(200,140,60,0.13);border:1px solid rgba(180,120,40,0.35);display:flex;align-items:center;gap:5px;user-select:none;-webkit-user-select:none" title="點擊跳頁"><span style="font-size:13px;opacity:.8">☰</span><span id="page-indicator-text">1 / 1</span></div>
         </div>
         <!-- 右箭頭（上一頁，直排往右） -->
         <div id="page-next-zone" class="page-zone">
@@ -3107,8 +3107,10 @@ function showPage_num(p,noAnim){
   _pageRenderToken++;
   const pg=document.getElementById('book-page-num');
   if(pg)pg.textContent=(p+1)+' / '+pages.length;
-  const pi=document.getElementById('page-indicator');
+  const pi=document.getElementById('page-indicator-text');
   if(pi)pi.textContent=(p+1)+' / '+pages.length;
+  const piOld=document.getElementById('page-indicator');
+  if(piOld && !piOld.querySelector('#page-indicator-text')) piOld.textContent=(p+1)+' / '+pages.length;
   // 更新滾輪 current 標記（若已開啟）
   document.querySelectorAll('.page-roller-item').forEach(el=>{
     el.classList.toggle('current',parseInt(el.dataset.page)===p);
