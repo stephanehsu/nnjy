@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.5</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.7</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -4583,11 +4583,11 @@ function goNextPage(){
     const nextP=currentPage+1;
     const pg=pages[nextP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
-    showPage_num(nextP);
+    showPage_num(nextP, audioMode);
     updateProgress();
   }else{
     currentIdx=0;
-    showPage_num(0);
+    showPage_num(0, audioMode);
     updateProgress();
   }
   syncAudioToCurrentIdx();
@@ -4598,7 +4598,7 @@ function goPrevPage(){
     const prevP=currentPage-1;
     const pg=pages[prevP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
-    showPage_num(prevP);
+    showPage_num(prevP, audioMode);
     updateProgress();
   }
   syncAudioToCurrentIdx();
@@ -4611,8 +4611,22 @@ function syncAudioToCurrentIdx(){
   if(!audioMode||!sutraAudioPlayer||!sutraTimeline)return;
   const seg=sutraTimeline.find(s=>s.idx===currentIdx);
   if(seg){
+    _syncLock=Infinity; // 先鎖死 polling
+    sutraAudioPlayer.pause();
     sutraAudioPlayer.currentTime=seg.start+0.05;
-    _syncLock=Date.now()+500; // 500ms 內 polling 不覆蓋 currentIdx
+    const resume=()=>{
+      sutraAudioPlayer.removeEventListener('seeked',resume);
+      _syncLock=Date.now()+50;
+      if(isPlaying) sutraAudioPlayer.play().catch(()=>{});
+    };
+    sutraAudioPlayer.addEventListener('seeked',resume,{once:true});
+    // 保險：500ms 後無論如何解鎖
+    setTimeout(()=>{
+      if(_syncLock===Infinity){
+        _syncLock=Date.now()+50;
+        if(isPlaying) sutraAudioPlayer.play().catch(()=>{});
+      }
+    },500);
   }
 }
 // 根據字元偏移量找對應的句子索引
