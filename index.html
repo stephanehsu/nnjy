@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.8</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.9</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -4583,11 +4583,11 @@ function goNextPage(){
     const nextP=currentPage+1;
     const pg=pages[nextP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
-    showPage_num(nextP, audioMode);
+    showPage_num(nextP, true);
     updateProgress();
   }else{
     currentIdx=0;
-    showPage_num(0, audioMode);
+    showPage_num(0, true);
     updateProgress();
   }
   syncAudioToCurrentIdx();
@@ -4598,7 +4598,7 @@ function goPrevPage(){
     const prevP=currentPage-1;
     const pg=pages[prevP];
     if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
-    showPage_num(prevP, audioMode);
+    showPage_num(prevP, true);
     updateProgress();
   }
   syncAudioToCurrentIdx();
@@ -4612,34 +4612,35 @@ function syncAudioToCurrentIdx(){
   // 找精確匹配或最近的 timeline segment
   let seg=sutraTimeline.find(s=>s.idx===currentIdx);
   if(!seg){
-    // 往後找最近的
     let nearest=null;
     for(const s of sutraTimeline){
       if(s.idx>=currentIdx){nearest=s;break;}
     }
-    // 往前找
-    if(!nearest){
-      nearest=sutraTimeline[sutraTimeline.length-1];
-    }
+    if(!nearest) nearest=sutraTimeline[sutraTimeline.length-1];
     seg=nearest;
   }
   if(!seg)return;
-  _syncLock=Infinity;
-  const wasPlaying=isPlaying&&!sutraAudioPlayer.paused;
+  console.log('[sync] currentIdx='+currentIdx+' seg.idx='+seg.idx+' seg.start='+seg.start.toFixed(2)+' text='+sentences[seg.idx]?.substring(0,10)+' curTime='+sutraAudioPlayer.currentTime.toFixed(2));
+  // 停掉 polling 避免干擾
+  stopAudioPoll();
+  const wasPlaying=!sutraAudioPlayer.paused;
   sutraAudioPlayer.pause();
   sutraAudioPlayer.currentTime=seg.start+0.01;
-  currentIdx=seg.idx; // 同步 currentIdx 到實際有時間軸的句子
+  currentIdx=seg.idx;
   updateHighlight();
   const resume=()=>{
     sutraAudioPlayer.removeEventListener('seeked',resume);
-    _syncLock=Date.now()+50;
+    console.log('[sync] seeked done, curTime='+sutraAudioPlayer.currentTime.toFixed(2));
+    startAudioPoll();
     if(wasPlaying) sutraAudioPlayer.play().catch(()=>{});
   };
   sutraAudioPlayer.addEventListener('seeked',resume,{once:true});
+  // 保險：500ms 後無論如何恢復
   setTimeout(()=>{
-    if(_syncLock===Infinity){
-      _syncLock=Date.now()+50;
-      if(wasPlaying) sutraAudioPlayer.play().catch(()=>{});
+    if(sutraAudioPlayer.paused && wasPlaying){
+      console.log('[sync] fallback resume');
+      startAudioPoll();
+      sutraAudioPlayer.play().catch(()=>{});
     }
   },500);
 }
