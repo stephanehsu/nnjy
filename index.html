@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.7</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.8.8</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -4608,26 +4608,40 @@ function goPrevPage(){
 // 翻頁後同步音頻位置到當前句子
 let _syncLock=0; // 防止 polling 馬上覆蓋 sync 結果
 function syncAudioToCurrentIdx(){
-  if(!audioMode||!sutraAudioPlayer||!sutraTimeline)return;
-  const seg=sutraTimeline.find(s=>s.idx===currentIdx);
-  if(seg){
-    _syncLock=Infinity; // 先鎖死 polling
-    sutraAudioPlayer.pause();
-    sutraAudioPlayer.currentTime=seg.start+0.05;
-    const resume=()=>{
-      sutraAudioPlayer.removeEventListener('seeked',resume);
-      _syncLock=Date.now()+50;
-      if(isPlaying) sutraAudioPlayer.play().catch(()=>{});
-    };
-    sutraAudioPlayer.addEventListener('seeked',resume,{once:true});
-    // 保險：500ms 後無論如何解鎖
-    setTimeout(()=>{
-      if(_syncLock===Infinity){
-        _syncLock=Date.now()+50;
-        if(isPlaying) sutraAudioPlayer.play().catch(()=>{});
-      }
-    },500);
+  if(!audioMode||!sutraAudioPlayer||!sutraTimeline||!sutraTimeline.length)return;
+  // 找精確匹配或最近的 timeline segment
+  let seg=sutraTimeline.find(s=>s.idx===currentIdx);
+  if(!seg){
+    // 往後找最近的
+    let nearest=null;
+    for(const s of sutraTimeline){
+      if(s.idx>=currentIdx){nearest=s;break;}
+    }
+    // 往前找
+    if(!nearest){
+      nearest=sutraTimeline[sutraTimeline.length-1];
+    }
+    seg=nearest;
   }
+  if(!seg)return;
+  _syncLock=Infinity;
+  const wasPlaying=isPlaying&&!sutraAudioPlayer.paused;
+  sutraAudioPlayer.pause();
+  sutraAudioPlayer.currentTime=seg.start+0.01;
+  currentIdx=seg.idx; // 同步 currentIdx 到實際有時間軸的句子
+  updateHighlight();
+  const resume=()=>{
+    sutraAudioPlayer.removeEventListener('seeked',resume);
+    _syncLock=Date.now()+50;
+    if(wasPlaying) sutraAudioPlayer.play().catch(()=>{});
+  };
+  sutraAudioPlayer.addEventListener('seeked',resume,{once:true});
+  setTimeout(()=>{
+    if(_syncLock===Infinity){
+      _syncLock=Date.now()+50;
+      if(wasPlaying) sutraAudioPlayer.play().catch(()=>{});
+    }
+  },500);
 }
 // 根據字元偏移量找對應的句子索引
 function sentencePageMap2sentIdx(offset){
