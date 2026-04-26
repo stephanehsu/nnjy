@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nnjy-v1.0.9.0';
+const CACHE_NAME = 'nnjy-v1.0.9.1';
 
 // 本地靜態資源
 const STATIC_ASSETS = [
