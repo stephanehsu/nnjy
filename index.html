@@ -1489,11 +1489,10 @@ body.reader-fullscreen #book-left{
         <div id="float-speed-btns" style="display:flex;gap:2px;align-items:center">
           <button class="spd-seg" data-speed="100" onclick="setSegSpeed(100,this)">2x</button>
           <button class="spd-seg" data-speed="167" onclick="setSegSpeed(167,this)">1.7x</button>
+          <button class="spd-seg" data-speed="200" onclick="setSegSpeed(200,this)">1.5x</button>
           <button class="spd-seg" data-speed="233" onclick="setSegSpeed(233,this)">1.3x</button>
           <button class="spd-seg active" data-speed="300" onclick="setSegSpeed(300,this)">1x</button>
           <button class="spd-seg" data-speed="367" onclick="setSegSpeed(367,this)">0.8x</button>
-          <button class="spd-seg" data-speed="433" onclick="setSegSpeed(433,this)">0.6x</button>
-          <button class="spd-seg" data-speed="500" onclick="setSegSpeed(500,this)">0.5x</button>
         </div>
       </div>
     </div>
@@ -2736,14 +2735,17 @@ async function checkAndDownloadAudio(title){
     // 先檢查 IDB
     const cached=await getAudioData(title);
     if(cached && cached.mp3 && cached.timeline){
-      // 比對版本號
+      // 比對版本號 + 格式
       const localVer=cached.ver||0;
-      if(localVer>=manifestVer || manifestVer===0){
-        console.log('[Audio] IDB 快取命中（v'+localVer+'）：'+title);
-        setupAudioMode(cached.mp3,cached.timeline,cached.ext||'mp3');
+      const localExt=cached.ext||'mp3';
+      const extMatch=(localExt===audioExt);
+      if(extMatch && (localVer>=manifestVer || manifestVer===0)){
+        console.log('[Audio] IDB 快取命中（v'+localVer+', '+localExt+'）：'+title);
+        setupAudioMode(cached.mp3,cached.timeline,localExt);
         return;
       }
-      console.log('[Audio] 有新版本 v'+localVer+' → v'+manifestVer+'：'+title);
+      if(!extMatch) console.log('[Audio] 格式變更 '+localExt+' → '+audioExt+'，重新下載：'+title);
+      else console.log('[Audio] 有新版本 v'+localVer+' → v'+manifestVer+'：'+title);
     }
 
     // 嘗試從 GitHub Pages 下載 JSON
@@ -2835,7 +2837,7 @@ function setupAudioMode(mp3Blob,timeline,ext){
   };
   sutraAudioPlayer.onerror=(e)=>{
     sutraAudioPlayer.onerror=null;
-    console.log('[Audio] 音頻載入失敗：',e);
+    console.log('[Audio] 音頻載入失敗：',e,'mime='+mime,'blobSize='+blob.size,'ext='+(ext||'mp3'));
     audioMode=false;
     updateAudioIcon();
     hideAudioProgress();
@@ -2961,11 +2963,11 @@ function stopAudioChant(){
   stopAudioPoll();
 }
 
-// 音頻速度控制（對應速度條 100ms~500ms → playbackRate 1.5~0.5）
+// 音頻速度控制（對應速度條 100ms~367ms → playbackRate 2.0~0.8）
 function updateAudioSpeed(){
-  // chantSpeed: 100(快) ~ 500(慢)
-  // playbackRate: 1.5(快) ~ 0.5(慢)
-  audioPlaybackRate=1.5-((chantSpeed-100)/(500-100))*1.0;
+  // chantSpeed: 100(快) ~ 367(慢)
+  // playbackRate: 2.0(快) ~ 0.8(慢)
+  audioPlaybackRate=2.0-((chantSpeed-100)/(367-100))*1.2;
   audioPlaybackRate=Math.max(0.5,Math.min(2.0,audioPlaybackRate));
   if(sutraAudioPlayer) sutraAudioPlayer.playbackRate=audioPlaybackRate;
 }
