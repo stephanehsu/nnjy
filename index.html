@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.2</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.3</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -4581,19 +4581,21 @@ function updateLapBtn(){
 function goNextPage(){
   if(currentPage<pages.length-1){
     const nextP=currentPage+1;
-    // sentencePageMap 是 {sentIdx: pageIdx}，找第一個映射到 nextP 的 sentIdx
     let firstIdx=-1;
     for(const [k,v] of Object.entries(sentencePageMap)){
       if(v===nextP){firstIdx=parseInt(k);break;}
     }
+    console.log('[goNext] curPage='+currentPage+' nextP='+nextP+' firstIdx='+firstIdx+' sentence='+(sentences[firstIdx]||'').substring(0,10)+' mapKeys='+Object.keys(sentencePageMap).length);
     if(firstIdx>=0) currentIdx=firstIdx;
     else{
       const pg=pages[nextP];
       if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
+      console.log('[goNext] fallback currentIdx='+currentIdx);
     }
     showPage_num(nextP, true);
     updateProgress();
   }else{
+    console.log('[goNext] last page, wrap to 0');
     currentIdx=0;
     showPage_num(0, true);
     updateProgress();
@@ -4608,10 +4610,12 @@ function goPrevPage(){
     for(const [k,v] of Object.entries(sentencePageMap)){
       if(v===prevP){firstIdx=parseInt(k);break;}
     }
+    console.log('[goPrev] curPage='+currentPage+' prevP='+prevP+' firstIdx='+firstIdx+' sentence='+(sentences[firstIdx]||'').substring(0,10));
     if(firstIdx>=0) currentIdx=firstIdx;
     else{
       const pg=pages[prevP];
       if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
+      console.log('[goPrev] fallback currentIdx='+currentIdx);
     }
     showPage_num(prevP, true);
     updateProgress();
