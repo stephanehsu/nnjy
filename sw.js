@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nnjy-v1.0.9.6';
+const CACHE_NAME = 'nnjy-v1.0.9.7';
 
 // 本地靜態資源
 const STATIC_ASSETS = [
@@ -54,7 +54,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // 音頻檔案（mp3/json in audio/）→ 不快取，直接走網路（IDB 自己管）
+  // 音頻檔案（mp3/m4a/json in audio/）→ 不快取，直接走網路（IDB 自己管）
   if (url.pathname.includes('/audio/')) {
     e.respondWith(fetch(e.request).catch(() => new Response('', {status: 503})));
     return;
