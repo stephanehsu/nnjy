@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.3</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.4</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2863,6 +2863,7 @@ function updateAudioIcon(){
 // 音頻播放 polling
 function startAudioPoll(){
   stopAudioPoll();
+  _syncLock=0; // 確保 polling 立即生效
   audioPollTimer=setInterval(()=>{
     if(!sutraAudioPlayer||sutraAudioPlayer.paused||!sutraTimeline)return;
     if(Date.now()<_syncLock)return;
