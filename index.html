@@ -914,8 +914,12 @@ body.reader-fullscreen #book-left{
   white-space:nowrap;
 }
 #chant-panel.open{
-  width:240px;opacity:1;pointer-events:auto;
+  width:220px;opacity:1;pointer-events:auto;
   padding:0 8px 0 12px;gap:6px;
+}
+#float-speed-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;width:18px;height:18px;
+  border-radius:50%;background:var(--accent);cursor:pointer;
 }
 
 /* 播放＋語音按鈕 — 縮小無外框 */
@@ -1389,7 +1393,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.7</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.8</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1485,15 +1489,11 @@ body.reader-fullscreen #book-left{
         <button class="c-btn play" id="btn-play" aria-label="播放"
           style="width:46px;height:46px;font-size:22px;background:rgba(37,30,23,.6);border:1px solid rgba(201,168,76,.35);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">▶</button>
       </div>
-      <div id="float-speed-wrap">
-        <div id="float-speed-btns" style="display:flex;gap:2px;align-items:center">
-          <button class="spd-seg" data-speed="100" onclick="setSegSpeed(100,this)">2x</button>
-          <button class="spd-seg" data-speed="167" onclick="setSegSpeed(167,this)">1.7x</button>
-          <button class="spd-seg" data-speed="200" onclick="setSegSpeed(200,this)">1.5x</button>
-          <button class="spd-seg" data-speed="233" onclick="setSegSpeed(233,this)">1.3x</button>
-          <button class="spd-seg active" data-speed="300" onclick="setSegSpeed(300,this)">1x</button>
-          <button class="spd-seg" data-speed="367" onclick="setSegSpeed(367,this)">0.8x</button>
-        </div>
+      <div id="float-speed-wrap" style="flex:1;min-width:0;display:flex;align-items:center;gap:6px">
+        <input type="range" id="float-speed-slider" min="100" max="500" step="10" value="300"
+          oninput="setSliderSpeed(this.value)"
+          style="flex:1;height:4px;accent-color:var(--accent);-webkit-appearance:none;cursor:pointer;background:rgba(200,168,112,.3);border-radius:2px;min-width:80px">
+        <span id="float-speed-label" style="font-size:11px;color:#c9a84c;font-family:var(--font-main);min-width:28px;text-align:center;white-space:nowrap">1x</span>
       </div>
     </div>
     <div id="chant-ball" aria-label="念誦控制">誦</div>
@@ -2963,11 +2963,11 @@ function stopAudioChant(){
   stopAudioPoll();
 }
 
-// 音頻速度控制（對應速度條 100ms~367ms → playbackRate 2.0~0.8）
+// 音頻速度控制（對應滑桿 100ms~500ms → playbackRate 2.0~0.5）
 function updateAudioSpeed(){
-  // chantSpeed: 100(快) ~ 367(慢)
-  // playbackRate: 2.0(快) ~ 0.8(慢)
-  audioPlaybackRate=2.0-((chantSpeed-100)/(367-100))*1.2;
+  // chantSpeed: 100(快) ~ 500(慢)
+  // playbackRate: 2.0(快) ~ 0.5(慢)，線性對應
+  audioPlaybackRate=300/chantSpeed;
   audioPlaybackRate=Math.max(0.5,Math.min(2.0,audioPlaybackRate));
   if(sutraAudioPlayer) sutraAudioPlayer.playbackRate=audioPlaybackRate;
 }
@@ -3411,12 +3411,23 @@ function calcDelay(){
   return n*chantSpeed;
 }
 
-function setSegSpeed(ms, el){
+function setSliderSpeed(ms){
+  ms=parseInt(ms)||300;
   chantSpeed=ms;
-  document.querySelectorAll('.spd-seg').forEach(b=>b.classList.remove('active'));
-  if(el) el.classList.add('active');
+  // 計算倍速顯示：300ms = 1x，100ms = 2x，500ms = 0.5x（反比關係）
+  const rate=300/ms;
+  const label=rate>=1.95?'2x':rate<=0.55?'0.5x':rate.toFixed(1)+'x';
+  const el=document.getElementById('float-speed-label');
+  if(el) el.textContent=label;
   updateAudioSpeed();
   if(isPlaying&&rafId)nextFireAt=performance.now()+calcDelay();
+}
+// 相容舊呼叫
+function setSegSpeed(ms){
+  chantSpeed=ms;
+  const slider=document.getElementById('float-speed-slider');
+  if(slider) slider.value=ms;
+  setSliderSpeed(ms);
 }
 
 // ── 點句 ──
