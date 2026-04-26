@@ -1389,7 +1389,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.6</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.7</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -2694,13 +2694,19 @@ function getAudioData(title){
   }));
 }
 
-function saveAudioData(title,mp3Blob,timeline,ver){
+function saveAudioData(title,mp3Blob,timeline,ver,ext){
   return openAudioIDB().then(db=>new Promise((res,rej)=>{
     const tx=db.transaction(AUDIO_IDB_STORE,'readwrite');
-    tx.objectStore(AUDIO_IDB_STORE).put({title,mp3:mp3Blob,timeline,ver:ver||0});
+    tx.objectStore(AUDIO_IDB_STORE).put({title,mp3:mp3Blob,timeline,ver:ver||0,ext:ext||'mp3'});
     tx.oncomplete=()=>res();
     tx.onerror=()=>rej(tx.error);
   }));
+}
+
+// 根據副檔名取得 MIME type
+function audioMimeType(ext){
+  if(ext==='m4a'||ext==='aac'||ext==='mp4') return 'audio/mp4';
+  return 'audio/mpeg';
 }
 
 // ══ 音頻 manifest 自動更新 ══
@@ -2722,8 +2728,10 @@ async function fetchAudioManifest(){
 // 檢查並自動下載音頻包（含版本比對）
 async function checkAndDownloadAudio(title){
   try{
-    // 取得 manifest 版本號
-    const manifestVer=_audioManifest?.[title]?.ver||0;
+    // 取得 manifest 版本號與副檔名
+    const manifestEntry=_audioManifest?.[title]||{};
+    const manifestVer=manifestEntry.ver||0;
+    const audioExt=manifestEntry.ext||'mp3';  // 支援 mp3 / m4a
 
     // 先檢查 IDB
     const cached=await getAudioData(title);
@@ -2732,7 +2740,7 @@ async function checkAndDownloadAudio(title){
       const localVer=cached.ver||0;
       if(localVer>=manifestVer || manifestVer===0){
         console.log('[Audio] IDB 快取命中（v'+localVer+'）：'+title);
-        setupAudioMode(cached.mp3,cached.timeline);
+        setupAudioMode(cached.mp3,cached.timeline,cached.ext||'mp3');
         return;
       }
       console.log('[Audio] 有新版本 v'+localVer+' → v'+manifestVer+'：'+title);
@@ -2745,15 +2753,15 @@ async function checkAndDownloadAudio(title){
     const timeline=await jsonResp.json();
     if(!Array.isArray(timeline)||timeline.length===0) return;
 
-    // 背景下載 mp3（不擋操作，顯示進度條）
+    // 背景下載音頻檔（不擋操作，顯示進度條）
     const updateMsg=cached?'更新音頻朗讀包…':'下載音頻朗讀包…';
     showAudioProgress(updateMsg, 0);
-    const mp3Url=AUDIO_BASE+encodeURIComponent(title)+'.mp3?t='+Date.now();
-    const mp3Resp=await fetch(mp3Url);
-    if(!mp3Resp.ok){ console.log('[Audio] MP3 下載失敗：'+title); hideAudioProgress(); return; }
+    const audioUrl=AUDIO_BASE+encodeURIComponent(title)+'.'+audioExt+'?t='+Date.now();
+    const audioResp=await fetch(audioUrl);
+    if(!audioResp.ok){ console.log('[Audio] 音頻下載失敗（'+audioExt+'）：'+title); hideAudioProgress(); return; }
 
-    const contentLength=parseInt(mp3Resp.headers.get('content-length')||'0');
-    const reader=mp3Resp.body.getReader();
+    const contentLength=parseInt(audioResp.headers.get('content-length')||'0');
+    const reader=audioResp.body.getReader();
     const chunks=[];
     let received=0;
 
@@ -2769,17 +2777,17 @@ async function checkAndDownloadAudio(title){
     }
 
     // 合併 chunks
-    const mp3ArrayBuffer=new Uint8Array(received);
+    const audioArrayBuffer=new Uint8Array(received);
     let pos=0;
     for(const chunk of chunks){
-      mp3ArrayBuffer.set(chunk,pos);
+      audioArrayBuffer.set(chunk,pos);
       pos+=chunk.length;
     }
 
-    // 存入 IDB（含版本號）
-    await saveAudioData(title,mp3ArrayBuffer.buffer,timeline,manifestVer);
+    // 存入 IDB（含版本號與副檔名）
+    await saveAudioData(title,audioArrayBuffer.buffer,timeline,manifestVer,audioExt);
     hideAudioProgress();
-    setupAudioMode(mp3ArrayBuffer.buffer,timeline);
+    setupAudioMode(audioArrayBuffer.buffer,timeline,audioExt);
     showAudioToast(cached?'音頻已更新至 v'+manifestVer:'音頻朗讀包已就緒');
   }catch(e){
     console.log('[Audio] 下載錯誤：',e);
@@ -2787,8 +2795,9 @@ async function checkAndDownloadAudio(title){
   }
 }
 
-function setupAudioMode(mp3Blob,timeline){
+function setupAudioMode(mp3Blob,timeline,ext){
   sutraTimeline=timeline;
+  const mime=audioMimeType(ext||'mp3');
   // 建立或重用 audio element
   if(!sutraAudioPlayer){
     sutraAudioPlayer=document.createElement('audio');
@@ -2806,11 +2815,11 @@ function setupAudioMode(mp3Blob,timeline){
   // 確保轉成 Blob 且有正確的 MIME type
   let blob;
   if(mp3Blob instanceof Blob){
-    blob = mp3Blob.type ? mp3Blob : new Blob([mp3Blob],{type:'audio/mpeg'});
+    blob = mp3Blob.type ? mp3Blob : new Blob([mp3Blob],{type:mime});
   }else if(mp3Blob instanceof ArrayBuffer){
-    blob = new Blob([mp3Blob],{type:'audio/mpeg'});
+    blob = new Blob([mp3Blob],{type:mime});
   }else{
-    blob = new Blob([mp3Blob],{type:'audio/mpeg'});
+    blob = new Blob([mp3Blob],{type:mime});
   }
   const url=URL.createObjectURL(blob);
   sutraAudioPlayer._blobUrl=url;
