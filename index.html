@@ -1448,7 +1448,6 @@ body.reader-fullscreen #book-left{
 
 <!-- 念誦控制 — 右下角 -->
 <div id="chant-float">
-  </div>
   <!-- 記數按鈕（最後一頁才顯示）-->
   <div id="lap-btn" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:159;">
     <button id="btn-manual-lap"
@@ -2002,8 +2001,6 @@ body.reader-fullscreen #book-left{
   </div>
 </div>
 
-<input type="file" id="file-input" accept=".txt" onchange="loadFile(event)">
-
 <script>
 // ── 狀態 ──
 let sentences=[],currentIdx=0,isPlaying=false;
@@ -2219,19 +2216,6 @@ function closeImportModal(){
 }
 function handleModalOverlayClick(e){
   if(e.target===document.getElementById('import-modal-overlay'))closeImportModal();
-}
-function loadFile(e){
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    const text=ev.target.result;
-    const title=f.name.replace(/\.txt$/i,'')||'匯入經文';
-    currentTitle=title;
-    addToLib(title,text);
-    processText(text);
-    showPage('reader');
-  };
-  r.readAsText(f,'UTF-8');e.target.value='';
 }
 
 // ── 斷句符號 ──
