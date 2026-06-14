@@ -1246,21 +1246,6 @@ body.reader-fullscreen #book-left{
   height:40px;
   background:linear-gradient(transparent,var(--bg));
 }
-/* ══ 念珠計數器 ══ */
-.bead-item{
-  width:34px;height:34px;border-radius:50%;flex-shrink:0;position:relative;
-  background:
-    radial-gradient(circle at 32% 28%, rgba(255,220,140,.7) 0%, rgba(255,200,100,.2) 40%, transparent 55%),
-    radial-gradient(circle at 70% 75%, rgba(0,0,0,.35) 0%, transparent 45%),
-    radial-gradient(ellipse at 50% 45%, #e8b060 0%, #c07830 30%, #8b4f18 60%, #5a2e08 100%);
-  box-shadow:
-    inset -4px -4px 8px rgba(0,0,0,.5),
-    inset 3px 3px 6px rgba(255,200,100,.35),
-    0 3px 10px rgba(0,0,0,.45);
-}
-/* 念珠容器需要 overflow:hidden 裁切超出的珠子 */
-#rosary-h-wrap{overflow:hidden}
-#rosary-v-wrap{overflow:hidden}
 /* 整排向左滑一格距離（34px珠 + 12px gap = 46px）*/
 @keyframes trackSlideLeft{
   0%{transform:translateX(0)}
@@ -1270,8 +1255,6 @@ body.reader-fullscreen #book-left{
   0%{transform:translateY(0)}
   100%{transform:translateY(-46px)}
 }
-#rosary-h-track.anim{animation:trackSlideLeft .5s ease-in-out forwards}
-#rosary-v-track.anim{animation:trackSlideUp .5s ease-in-out forwards}
 
 .page-heading{
   font-family:var(--font-main);font-size:18px;letter-spacing:.25em;
@@ -1395,7 +1378,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.9</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.10</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1465,10 +1448,6 @@ body.reader-fullscreen #book-left{
 
 <!-- 念誦控制 — 右下角 -->
 <div id="chant-float">
-  <!-- 垂直念珠（在加1按鈕上方）-->
-  <div id="rosary-v-wrap" style="display:none;flex-direction:column;align-items:center;gap:10px;align-self:flex-end;padding-bottom:6px;position:relative">
-    <div id="rosary-v-line" style="position:absolute;top:0;bottom:0;left:50%;width:2px;background:#8b6030;opacity:.5;z-index:0;transform:translateX(-50%)"></div>
-    <div id="rosary-v-track" style="display:flex;flex-direction:column;align-items:center;gap:10px;position:relative;z-index:1"></div>
   </div>
   <!-- 記數按鈕（最後一頁才顯示）-->
   <div id="lap-btn" style="display:none;position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:159;">
@@ -1507,12 +1486,7 @@ body.reader-fullscreen #book-left{
   </div>
 </div>
 
-<audio id="audio-bead" preload="auto"><source src="data:audio/mp3;base64,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" type="audio/mp3"></audio>
-<!-- 水平念珠（底部置中）-->
-<div id="rosary-h-wrap" style="display:none;position:fixed;bottom:0;left:0;right:0;height:72px;z-index:155;align-items:center;justify-content:center;background:linear-gradient(transparent,rgba(240,232,208,.95));pointer-events:auto">
   <div style="position:relative;display:flex;align-items:center;justify-content:center">
-    <div id="rosary-h-line" style="position:absolute;top:50%;left:0;right:0;height:2px;background:#8b6030;opacity:.5;transform:translateY(-50%)"></div>
-    <div id="rosary-h-track" style="display:flex;align-items:center;gap:12px;position:relative;z-index:1"></div>
   </div>
 </div>
 
@@ -1709,42 +1683,8 @@ body.reader-fullscreen #book-left{
     <div style="margin-top:8px;font-size:12px;color:var(--text3);line-height:1.7">
       開啟後換句時裝置將朗讀該句文字。<br>需允許瀏覽器使用語音功能。
     </div>
-    <div style="margin-top:12px">
-      <span class="toggle-label" style="font-size:13px">TTS 引擎</span>
-      <div class="mode-row" style="margin-top:6px">
-        <div class="mode-btn" id="tts-eng-browser" onclick="setTTSEngine('browser')">瀏覽器預設</div>
-        <div class="mode-btn" id="tts-eng-kokoro" onclick="setTTSEngine('kokoro')">Kokoro AI</div>
-      </div>
-    </div>
-    <div id="kokoro-voice-section" style="margin-top:10px;display:none">
-      <span class="toggle-label" style="font-size:13px">Kokoro 語音</span>
-      <div class="mode-row" style="margin-top:6px;flex-wrap:wrap;gap:6px">
-        <div class="mode-btn" id="kv-zf_001" onclick="setKokoroVoice('zf_001')">女聲 1</div>
-        <div class="mode-btn" id="kv-zf_002" onclick="setKokoroVoice('zf_002')">女聲 2</div>
-        <div class="mode-btn" id="kv-zf_010" onclick="setKokoroVoice('zf_010')">女聲 10</div>
-        <div class="mode-btn" id="kv-zf_020" onclick="setKokoroVoice('zf_020')">女聲 20</div>
-        <div class="mode-btn" id="kv-zm_001" onclick="setKokoroVoice('zm_001')">男聲 1</div>
-        <div class="mode-btn" id="kv-zm_010" onclick="setKokoroVoice('zm_010')">男聲 10</div>
-        <div class="mode-btn" id="kv-zm_020" onclick="setKokoroVoice('zm_020')">男聲 20</div>
-        <div class="mode-btn" id="kv-zm_030" onclick="setKokoroVoice('zm_030')">男聲 30</div>
-      </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.6">
-        Kokoro AI 中文語音（v1.1-zh），首次使用需下載約 160MB 模型（之後快取）。<br>共 100 個中文語音（zf_001~050 女聲、zm_001~050 男聲），上方為精選。
-      </div>
-    </div>
   </div>
 
-  <div class="s-section">
-    <span class="s-label">念珠計數（佛號短咒）</span>
-    <div style="font-size:12px;color:var(--text3);line-height:1.8;margin-bottom:10px">
-      開啟後閱讀佛號短咒時，畫面下方顯示念珠，滑動撥珠計遍。
-    </div>
-    <div class="mode-row">
-      <div class="mode-btn" id="rosary-btn" onclick="setRosaryMode('btn',this)">按鈕</div>
-      <div class="mode-btn" id="rosary-h" onclick="setRosaryMode('h',this)">橫向滑動</div>
-      <div class="mode-btn" id="rosary-v" onclick="setRosaryMode('v',this)">垂直滑動</div>
-    </div>
-  </div>
 
   <div class="s-section">
     <span class="s-label">斷句符號</span>
@@ -1936,6 +1876,33 @@ body.reader-fullscreen #book-left{
     <!-- 分隔線 -->
     <div style="border-top:1px solid var(--border2);margin:0 0 .9rem"></div>
 
+    <!-- 歷史累積遍數 -->
+    <div style="font-size:11px;color:var(--accent);letter-spacing:.12em;margin-bottom:.4rem;font-family:var(--font-main)">歷史累積遍數</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;font-family:var(--font-main);line-height:1.6">
+      所有時間念誦的總遍數，不受本輪歸零影響
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:.6rem">
+      <button onclick="goalModalHistAdj(-1)"
+        style="width:40px;height:40px;border-radius:50%;background:transparent;
+               border:2px solid var(--border2);color:var(--text2);font-size:22px;
+               cursor:pointer;font-family:var(--font-main);display:flex;align-items:center;justify-content:center">−</button>
+      <div style="text-align:center;min-width:64px">
+        <input type="number" id="goal-modal-hist-input" min="0"
+          style="width:72px;text-align:center;font-size:28px;font-weight:700;
+                 color:var(--accent);background:var(--bg3);border:1px solid var(--border);
+                 border-radius:6px;padding:6px;font-family:var(--font-main);
+                 -webkit-appearance:none;-moz-appearance:textfield">
+        <div style="font-size:10px;color:var(--text3);font-family:var(--font-main);margin-top:2px">遍</div>
+      </div>
+      <button onclick="goalModalHistAdj(1)"
+        style="width:40px;height:40px;border-radius:50%;background:transparent;
+               border:2px solid var(--border2);color:var(--text2);font-size:22px;
+               cursor:pointer;font-family:var(--font-main);display:flex;align-items:center;justify-content:center">+</button>
+    </div>
+
+    <!-- 分隔線 -->
+    <div style="border-top:1px solid var(--border2);margin:0 0 .9rem"></div>
+
     <div style="display:flex;gap:10px">
       <button onclick="closeGoalModal()"
         style="flex:1;height:44px;border-radius:4px;background:none;
@@ -1995,56 +1962,6 @@ body.reader-fullscreen #book-left{
   </div>
 </div>
 
-<!-- 編輯歷史累積遍數 Modal -->
-<div id="edit-modal-overlay" onclick="handleEditOverlayClick(event)"
-  style="display:none;position:fixed;inset:0;z-index:450;background:rgba(0,0,0,.6);
-         align-items:center;justify-content:center;padding:1.5rem;writing-mode:horizontal-tb">
-  <div id="edit-modal" style="background:var(--bg);border:2px solid var(--border);border-radius:8px;
-              width:100%;max-width:320px;padding:1.5rem;animation:fadeIn .25s ease">
-    <div style="font-family:var(--font-main);font-size:15px;color:var(--text);
-                letter-spacing:.1em;margin-bottom:.75rem" id="edit-lap-title"></div>
-
-    <div style="font-size:11px;color:var(--accent);letter-spacing:.12em;margin-bottom:.4rem;font-family:var(--font-main)">歷史累積遍數</div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:.75rem;font-family:var(--font-main);line-height:1.6">
-      所有時間念誦的總遍數，不受本輪歸零影響
-    </div>
-    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:.6rem">
-      <button onclick="editLapAdjust(-1)"
-        style="width:40px;height:40px;border-radius:50%;background:transparent;
-               border:2px solid var(--border2);color:var(--text2);font-size:22px;
-               cursor:pointer;font-family:var(--font-main);display:flex;align-items:center;justify-content:center">−</button>
-      <div style="text-align:center;min-width:64px">
-        <input type="number" id="edit-lap-input" min="0"
-          style="width:72px;text-align:center;font-size:28px;font-weight:700;
-                 color:var(--accent);background:var(--bg3);border:1px solid var(--border);
-                 border-radius:6px;padding:6px;font-family:var(--font-main);
-                 -webkit-appearance:none;-moz-appearance:textfield">
-        <div style="font-size:10px;color:var(--text3);font-family:var(--font-main);margin-top:2px">遍</div>
-      </div>
-      <button onclick="editLapAdjust(1)"
-        style="width:40px;height:40px;border-radius:50%;background:transparent;
-               border:2px solid var(--border2);color:var(--text2);font-size:22px;
-               cursor:pointer;font-family:var(--font-main);display:flex;align-items:center;justify-content:center">+</button>
-    </div>
-
-    <div style="border-top:1px solid var(--border2);margin:.9rem 0"></div>
-
-    <div style="display:flex;gap:10px">
-      <button onclick="closeEditModal()"
-        style="flex:1;height:44px;border-radius:4px;background:none;
-               border:1px solid var(--border);color:var(--text2);
-               font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
-        取消
-      </button>
-      <button onclick="confirmEditLap()"
-        style="flex:1;height:44px;border-radius:4px;background:var(--accent);
-               border:none;color:#f5edd8;
-               font-family:var(--font-main);font-size:14px;cursor:pointer;letter-spacing:.08em">
-        儲存
-      </button>
-    </div>
-  </div>
-</div>
 <div id="import-modal-overlay" onclick="handleModalOverlayClick(event)">
   <div id="import-modal">
     <div class="modal-header">
@@ -2097,22 +2014,6 @@ body.reader-fullscreen #book-left{
 // ── 狀態 ──
 let sentences=[],currentIdx=0,isPlaying=false;
 let chantMode='auto',chantSpeed=300,ttsEnabled=false;
-// ── Kokoro TTS 引擎 ──
-let ttsEngine='browser'; // 'browser' | 'kokoro'
-let kokoroTTS=null;       // KokoroTTS instance
-let kokoroVoice='zf_001'; // 預設中文女聲
-let kokoroLoading=false;
-let kokoroAudioCtx=null;
-// 從 localStorage 恢復 TTS 引擎設定
-(function(){
-  ttsEngine=localStorage.getItem('nnjy_tts_engine')||'browser';
-  kokoroVoice=localStorage.getItem('nnjy_kokoro_voice')||'zf_001';
-  // 遷移：舊版 v1.0 語音名稱（zf_xiaobei 等）→ v1.1-zh 編號
-  if(kokoroVoice.includes('xiao')||kokoroVoice.includes('yun')){
-    kokoroVoice='zf_001';
-    localStorage.setItem('nnjy_kokoro_voice',kokoroVoice);
-  }
-})();
 let timer=null,chantActive=false,panelOpen=false;
 
 // ── 書庫（localStorage）──
@@ -2185,8 +2086,7 @@ function renderLib(){
         <div class="lib-item-meta" id="lib-meta-${encodeURIComponent(i.title)}">${i.date}</div>
       </div>
       <div style="display:flex;gap:4px;flex-shrink:0;align-items:center">
-        <button class="lib-item-del" onclick="event.stopPropagation();openGoalModal('${encodeURIComponent(i.title)}')" aria-label="目標" style="color:var(--accent);font-size:13px" title="設定目標遍數">🎯</button>
-        <button class="lib-item-del" onclick="event.stopPropagation();openEditModal('${encodeURIComponent(i.title)}')" aria-label="修改遍數" style="color:var(--text3);font-size:13px" title="修改遍數">✎</button>
+        <button class="lib-item-del" onclick="event.stopPropagation();openGoalModal('${encodeURIComponent(i.title)}')" aria-label="遍數管理" style="color:var(--accent);font-size:13px" title="遍數管理">✎</button>
         <button class="lib-item-del" onclick="event.stopPropagation();openDeleteModal('${encodeURIComponent(i.title)}')" aria-label="刪除">✕</button>
       </div>
     </div>`;
@@ -2216,59 +2116,6 @@ function closeDeleteModal(){
   if(btn) btn.textContent='刪除';
 }
 
-// ── 修改遍數 Modal ──
-let editingTitle='';
-function openEditModal(encodedTitle){
-  const title=decodeURIComponent(encodedTitle);
-  editingTitle=title;
-  document.getElementById('edit-lap-title').textContent=title;
-  document.getElementById('edit-lap-input').value='0';
-  document.getElementById('edit-modal-overlay').style.display='flex';
-  // 顯示歷史累積遍數（所有 lapEvents）
-  if(window._lapsGetByTitle){
-    window._lapsGetByTitle(title).then(evs=>{
-      document.getElementById('edit-lap-input').value=evs.length;
-    });
-  }
-}
-function closeEditModal(){
-  document.getElementById('edit-modal-overlay').style.display='none';
-}
-// clearLapFromEditModal removed (replaced by startNewRoundFromModal)
-function handleEditOverlayClick(e){
-  if(e.target===document.getElementById('edit-modal-overlay'))closeEditModal();
-}
-function editLapAdjust(delta){
-  const input=document.getElementById('edit-lap-input');
-  const val=Math.max(0,parseInt(input.value||'0')+delta);
-  input.value=val;
-}
-async function confirmEditLap(){
-  const target=Math.max(0,parseInt(document.getElementById('edit-lap-input').value||'0'));
-  if(!window._lapsGetByTitle){closeEditModal();return;}
-  // 歷史累積 = 所有 lapEvents 筆數（不分輪次）
-  const allEvs=await window._lapsGetByTitle(editingTitle);
-  const current=allEvs.length;
-  const diff=target-current;
-  if(diff>0){
-    for(let i=0;i<diff;i++) await window._lapsAddEvent(editingTitle);
-    markDirty();
-    if(window._fbUser && window._fbSyncLaps)
-      window._fbSyncLaps(window._fbUser.uid,true).then(()=>clearDirty());
-  }else if(diff<0){
-    // 刪除最近幾筆（不限本輪）
-    const toDelete=allEvs.sort((a,b)=>b.timestamp-a.timestamp).slice(0,Math.abs(diff));
-    const ids=toDelete.map(e=>e.lapId);
-    if(ids.length){
-      await window._lapsDeleteByIds(ids);
-      if(window._fbUser && window._fbDeleteLapIds)
-        window._fbDeleteLapIds(window._fbUser.uid,ids).catch(()=>{});
-    }
-  }
-  if(currentTitle===editingTitle) updateLapDisplay(editingTitle);
-  closeEditModal();
-  renderLib();
-}
 function openFromLib(encodedTitle){
   const title=decodeURIComponent(encodedTitle);
   const lib=loadLib();
@@ -2296,9 +2143,6 @@ function openFromLib(encodedTitle){
   // 檢查音頻包
   clearAudioMode();
   checkAndDownloadAudio(title);
-  const rosaryMode=localStorage.getItem('nnjy_rosary')||'off';
-  showRosary(currentCategory==='佛號短咒'&&rosaryMode!=='off');
-  rosaryPos=0;
 }
 function setFont(el){
   document.querySelectorAll('.font-item').forEach(f=>f.classList.remove('active'));
@@ -2310,7 +2154,6 @@ function setFont(el){
 function openSettings(){
   document.getElementById('settings-panel').classList.add('open');
   document.getElementById('settings-overlay').classList.add('show');
-  updateTTSEngineUI();
 }
 function closeSettings(){
   document.getElementById('settings-panel').classList.remove('open');
@@ -3436,96 +3279,17 @@ function stopChant(){
   ball.classList.remove('playing');
   ball.textContent='誦';
   if(window.speechSynthesis)speechSynthesis.cancel();
-  stopKokoroPlayback();
   stopAudioChant();
 }
 
-// ── Kokoro TTS 引擎 ──
-async function initKokoro(showProgress){
-  if(kokoroTTS) return true;
-  if(kokoroLoading) return false;
-  kokoroLoading=true;
-  if(showProgress) showAudioProgress('載入 Kokoro TTS 模型…（首次約 160MB）',0);
-  try{
-    const mod=await import('https://esm.sh/kokoro-js@1.2.1');
-    if(showProgress) showAudioProgress('初始化 Kokoro TTS…',30);
-    const model_id='onnx-community/Kokoro-82M-v1.1-zh-ONNX';
-    kokoroTTS=await mod.KokoroTTS.from_pretrained(model_id,{
-      dtype:'q8',
-      device:'wasm',
-      progress_callback:(p)=>{
-        if(showProgress && p.progress!==undefined){
-          const pct=Math.round(30+p.progress*0.65);
-          showAudioProgress('下載模型…',pct);
-        }
-      }
-    });
-    if(showProgress) hideAudioProgress();
-    kokoroLoading=false;
-    console.log('[Kokoro] 模型載入完成');
-    return true;
-  }catch(e){
-    console.error('[Kokoro] 載入失敗：',e);
-    if(showProgress) hideAudioProgress();
-    kokoroLoading=false;
-    showAudioToast('Kokoro TTS 載入失敗，已切回瀏覽器語音');
-    ttsEngine='browser';
-    saveTTSEngine();
-    updateTTSEngineUI();
-    return false;
-  }
-}
-
-let _kokoroPlaySrc=null; // current AudioBufferSourceNode
-function stopKokoroPlayback(){
-  if(_kokoroPlaySrc){try{_kokoroPlaySrc.stop();}catch(e){}_kokoroPlaySrc=null;}
-}
-
-async function speakKokoro(text, onDone){
-  if(!text){if(onDone)onDone();return;}
-  if(!kokoroTTS){
-    const ok=await initKokoro(true);
-    if(!ok){speakBrowser(text,onDone);return;}
-  }
-  try{
-    stopKokoroPlayback();
-    const speed=Math.max(0.5,Math.min(2.0,300/chantSpeed));
-    const result=await kokoroTTS.generate(text,{voice:kokoroVoice,speed});
-    // result.audio is Float32Array, result.sampling_rate is number
-    if(!kokoroAudioCtx) kokoroAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    const sr=result.sampling_rate||24000;
-    const buf=kokoroAudioCtx.createBuffer(1,result.audio.length,sr);
-    buf.copyToChannel(result.audio,0);
-    const src=kokoroAudioCtx.createBufferSource();
-    src.buffer=buf;
-    src.connect(kokoroAudioCtx.destination);
-    _kokoroPlaySrc=src;
-    src.onended=()=>{_kokoroPlaySrc=null;if(onDone)onDone();};
-    src.start();
-  }catch(e){
-    console.error('[Kokoro] 生成失敗：',e);
-    _kokoroPlaySrc=null;
-    speakBrowser(text,onDone);
-  }
-}
-
-function speakBrowser(text, onDone){
+function speak(text, onDone){
   if(!window.speechSynthesis){if(onDone)onDone();return;}
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text);
+  const u=new SpeechSynthesisUtterance(stripBold(text));
   u.lang='zh-TW';
   u.rate=Math.max(0.7,Math.min(1.2,1.2-(chantSpeed-100)/(500-100)*0.5));
   if(onDone)u.onend=onDone;
   speechSynthesis.speak(u);
-}
-
-function speak(text, onDone){
-  const clean=stripBold(text);
-  if(ttsEngine==='kokoro'){
-    speakKokoro(clean,onDone);
-  }else{
-    speakBrowser(clean,onDone);
-  }
 }
 
 // ── 速度分段 ──
@@ -3700,46 +3464,7 @@ function toggleTTS(){
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
   document.getElementById('btn-tts').textContent=ttsEnabled?'🔊':'🔇';
   if(ttsEnabled&&chantActive)speak(sentences[currentIdx]);
-  else if(!ttsEnabled){
-    if(window.speechSynthesis)speechSynthesis.cancel();
-    stopKokoroPlayback();
-  }
-}
-
-// ── TTS 引擎設定 ──
-function setTTSEngine(eng){
-  ttsEngine=eng;
-  saveTTSEngine();
-  updateTTSEngineUI();
-  // 切換到 Kokoro 時預載模型
-  if(eng==='kokoro' && !kokoroTTS && !kokoroLoading) initKokoro(true);
-}
-function setKokoroVoice(v){
-  kokoroVoice=v;
-  saveTTSEngine();
-  updateKokoroVoiceUI();
-}
-function saveTTSEngine(){
-  localStorage.setItem('nnjy_tts_engine',ttsEngine);
-  localStorage.setItem('nnjy_kokoro_voice',kokoroVoice);
-}
-function loadTTSEngine(){
-  ttsEngine=localStorage.getItem('nnjy_tts_engine')||'browser';
-  kokoroVoice=localStorage.getItem('nnjy_kokoro_voice')||'zf_001';
-}
-function updateTTSEngineUI(){
-  const browsers=document.getElementById('tts-eng-browser');
-  const kokoros=document.getElementById('tts-eng-kokoro');
-  if(browsers) browsers.classList.toggle('active',ttsEngine==='browser');
-  if(kokoros) kokoros.classList.toggle('active',ttsEngine==='kokoro');
-  const voiceSec=document.getElementById('kokoro-voice-section');
-  if(voiceSec) voiceSec.style.display=ttsEngine==='kokoro'?'block':'none';
-  updateKokoroVoiceUI();
-}
-function updateKokoroVoiceUI(){
-  document.querySelectorAll('[id^="kv-"]').forEach(el=>{
-    el.classList.toggle('active',el.id==='kv-'+kokoroVoice);
-  });
+  else if(!ttsEnabled&&window.speechSynthesis)speechSynthesis.cancel();
 }
 
 // ══ 統計資料 ══
@@ -3801,15 +3526,32 @@ function openGoalModal(encodedTitle){
       _goalModalCurLap=0;
     }
   }
+  // 載入歷史累積遍數
+  const histEl=document.getElementById('goal-modal-hist-input');
+  if(histEl){
+    histEl.value='0';
+    if(window._lapsGetByTitle){
+      window._lapsGetByTitle(goalModalTitle).then(evs=>{
+        histEl.value=evs.length;
+        _goalModalHistLap=evs.length;
+      });
+    }
+  }
   document.getElementById('goal-modal-overlay').style.display='flex';
   setTimeout(()=>document.getElementById('goal-input').focus(),100);
 }
 // 本輪遍數暫存（modal 內調整用）
 let _goalModalCurLap=0;
+let _goalModalHistLap=0;
 function goalModalLapAdj(delta){
   _goalModalCurLap=Math.max(0,_goalModalCurLap+delta);
   const el=document.getElementById('goal-modal-cur-lap');
   if(el) el.textContent=_goalModalCurLap;
+}
+function goalModalHistAdj(delta){
+  const input=document.getElementById('goal-modal-hist-input');
+  const val=Math.max(0,parseInt(input.value||'0')+delta);
+  input.value=val;
 }
 async function goalModalStartNewRound(){
   if(!goalModalTitle) return;
@@ -3841,7 +3583,7 @@ async function confirmGoal(){
   const goals=loadGoals();
   goals[goalModalTitle]=v;
   saveGoals(goals);
-  // 同時套用本輪遍數調整
+  // 套用本輪遍數調整
   if(window._getCurLapCount && window._lapsAddEvent){
     const current=await window._getCurLapCount(goalModalTitle);
     const diff=_goalModalCurLap-current;
@@ -3856,6 +3598,26 @@ async function confirmGoal(){
       const allEvs=await window._lapsGetByTitle(goalModalTitle);
       const curEvs=allEvs.filter(e=>e.timestamp>startTs).sort((a,b)=>b.timestamp-a.timestamp);
       const toDelete=curEvs.slice(0,Math.abs(diff));
+      const ids=toDelete.map(e=>e.lapId);
+      if(ids.length){
+        await window._lapsDeleteByIds(ids);
+        if(window._fbUser && window._fbDeleteLapIds)
+          window._fbDeleteLapIds(window._fbUser.uid,ids).catch(()=>{});
+      }
+    }
+  }
+  // 套用歷史累積遍數調整
+  const histTarget=Math.max(0,parseInt(document.getElementById('goal-modal-hist-input').value||'0'));
+  if(window._lapsGetByTitle){
+    const allEvs=await window._lapsGetByTitle(goalModalTitle);
+    const histDiff=histTarget-allEvs.length;
+    if(histDiff>0){
+      for(let i=0;i<histDiff;i++) await window._lapsAddEvent(goalModalTitle);
+      markDirty();
+      if(window._fbUser && window._fbSyncLaps)
+        window._fbSyncLaps(window._fbUser.uid,true).then(()=>clearDirty());
+    }else if(histDiff<0){
+      const toDelete=allEvs.sort((a,b)=>b.timestamp-a.timestamp).slice(0,Math.abs(histDiff));
       const ids=toDelete.map(e=>e.lapId);
       if(ids.length){
         await window._lapsDeleteByIds(ids);
@@ -3923,24 +3685,6 @@ async function confirmNewRound(){
   // 重啟念誦
   if(_newRoundWasPlaying) startChant();
 }
-function confirmStartNewRoundFromModal(){
-  const title=editingTitle;
-  // 用現有 delete-modal 做確認
-  document.getElementById('delete-modal-title').textContent='「'+title+'」開始新一輪？\n歷史遍數繼續累積';
-  document.getElementById('delete-modal-confirm').textContent='開始新一輪';
-  document.getElementById('delete-modal-confirm').onclick=async()=>{
-    document.getElementById('delete-modal-confirm').textContent='刪除';
-    closeEditModal();
-    closeDeleteModal();
-    await doStartNewRound(title);
-  };
-  document.getElementById('delete-modal-overlay').style.display='flex';
-}
-async function startNewRoundFromModal(){
-  const title=editingTitle;
-  closeEditModal();
-  await doStartNewRound(title);
-}
 async function doStartNewRound(title){
   if(!title||!window._sessAddNew)return;
   await window._sessAddNew(title);
@@ -3958,146 +3702,6 @@ function saveLaps(d){localStorage.setItem(LAP_KEY,JSON.stringify(d))}
 
 // 取今天日期字串
 function today(){return new Date().toISOString().slice(0,10)}
-
-// ══ 念珠計數器 ══
-function buildBeads(trackId, count){
-  const track=document.getElementById(trackId);
-  if(!track)return;
-  track.innerHTML='';
-  track.style.transform='';
-  const n=count||5;
-  for(let i=0;i<n;i++){
-    const b=document.createElement('div');
-    b.className='bead-item';
-    track.appendChild(b);
-  }
-}
-
-function animateBeads(mode){
-  const trackId=mode==='v'?'rosary-v-track':'rosary-h-track';
-  const track=document.getElementById(trackId);
-  if(!track)return;
-  // 先建 6 顆（第6顆在可視區右/下方外）
-  buildBeads(trackId,6);
-  track.classList.remove('anim');
-  void track.offsetWidth;
-  track.classList.add('anim');
-  // 動畫結束後重建 5 顆，恢復正常狀態
-  setTimeout(()=>{
-    track.classList.remove('anim');
-    buildBeads(trackId,5);
-  },520);
-}
-
-function showRosary(show){
-  const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
-  const hw=document.getElementById('rosary-h-wrap');
-  const vw=document.getElementById('rosary-v-wrap');
-  if(hw){
-    hw.style.display=(show&&rosaryMode==='h')?'flex':'none';
-    if(show&&rosaryMode==='h'){
-      // 固定顯示寬度 = 5顆(34px) + 4間距(12px) = 218px，裁切第6顆
-      const track=document.getElementById('rosary-h-track');
-      if(track)track.style.clipPath='inset(0 0 0 0)';
-      hw.style.overflow='hidden';
-      buildBeads('rosary-h-track',5);
-    }
-  }
-  if(vw){
-    vw.style.display=(show&&rosaryMode==='v')?'flex':'none';
-    if(show&&rosaryMode==='v'){
-      vw.style.overflow='hidden';
-      buildBeads('rosary-v-track',5);
-    }
-  }
-}
-
-function playBeadSound(){
-  const el=document.getElementById('audio-bead');
-  if(el){el.currentTime=0;el.play().catch(()=>{});}
-}
-
-function triggerRosaryLap(mode){
-  if(!currentTitle)return;
-  playBeadSound();
-  animateBeads(mode);
-  recordLap(currentTitle);
-}
-
-// 水平念珠手勢
-let rosaryHStart=null;
-(function(){
-  const wrap=document.getElementById('rosary-h-wrap');
-  if(!wrap)return;
-  wrap.addEventListener('touchstart',e=>{
-    rosaryHStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
-    e.stopPropagation();
-  },{passive:true});
-  wrap.addEventListener('touchend',e=>{
-    if(!rosaryHStart)return;
-    const dx=e.changedTouches[0].clientX-rosaryHStart.x;
-    const dy=e.changedTouches[0].clientY-rosaryHStart.y;
-    rosaryHStart=null;
-    if(Math.abs(dx)>Math.abs(dy)&&dx<-20) triggerRosaryLap('h');
-    e.stopPropagation();
-  },{passive:true});
-  wrap.addEventListener('mousedown',e=>{rosaryHStart={x:e.clientX,y:e.clientY};});
-  wrap.addEventListener('mouseup',e=>{
-    if(!rosaryHStart)return;
-    const dx=e.clientX-rosaryHStart.x;
-    rosaryHStart=null;
-    if(dx<-20) triggerRosaryLap('h');
-  });
-})();
-
-// 垂直念珠手勢
-let rosaryVStart=null;
-(function(){
-  const wrap=document.getElementById('rosary-v-wrap');
-  if(!wrap)return;
-  wrap.addEventListener('touchstart',e=>{
-    rosaryVStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
-    e.stopPropagation();
-    e.preventDefault(); // 防止頁面滾動
-  },{passive:false});
-  wrap.addEventListener('touchmove',e=>{
-    e.preventDefault(); // 滑動中也阻止頁面移動
-    e.stopPropagation();
-  },{passive:false});
-  wrap.addEventListener('touchend',e=>{
-    if(!rosaryVStart)return;
-    const dx=e.changedTouches[0].clientX-rosaryVStart.x;
-    const dy=e.changedTouches[0].clientY-rosaryVStart.y;
-    rosaryVStart=null;
-    if(Math.abs(dy)>Math.abs(dx)&&dy<-20) triggerRosaryLap('v');
-    e.stopPropagation();
-    e.preventDefault();
-  },{passive:false});
-  wrap.addEventListener('mousedown',e=>{rosaryVStart={x:e.clientX,y:e.clientY};});
-  wrap.addEventListener('mouseup',e=>{
-    if(!rosaryVStart)return;
-    const dy=e.clientY-rosaryVStart.y;
-    rosaryVStart=null;
-    if(dy<-20) triggerRosaryLap('v');
-  });
-})();
-
-function setRosaryMode(mode,el){
-  localStorage.setItem('nnjy_rosary',mode);
-  document.querySelectorAll('#rosary-btn,#rosary-h,#rosary-v').forEach(b=>b.classList.remove('active'));
-  if(el)el.classList.add('active');
-  if(currentCategory==='佛號短咒'){
-    showRosary(true);
-    updateLapBtn(); // 按鈕顯示/隱藏
-  }
-}
-
-// 初始化念珠設定按鈕狀態
-(function(){
-  const mode=localStorage.getItem('nnjy_rosary')||'btn';
-  const el=document.getElementById('rosary-'+mode);
-  if(el)el.classList.add('active');
-})();
 
 // ── 音效 ──
 let _audioCtx=null;
@@ -4180,9 +3784,7 @@ function recordLap(title){
     } else {
       // 未達標：播木魚，跳回第一頁繼續
       showLapFlash(curLap);
-      const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
-      const usingRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
-      const noWoodfish=(currentCategory==='佛號短咒'&&ttsEnabled)||usingRosary;
+      const noWoodfish=currentCategory==='佛號短咒'&&ttsEnabled;
       if(!noWoodfish) playLapSound();
       // 跳回第一頁
       currentIdx=0;currentPage=-1;
@@ -4667,7 +4269,6 @@ document.getElementById('btn-calendar').addEventListener('click',()=>{showCalend
       ball.classList.remove('playing');
       ball.textContent='誦';
       if(window.speechSynthesis) speechSynthesis.cancel();
-      stopKokoroPlayback();
       stopAudioChant();
     } else {
       // 若停在最後一句，先跳回開頭
@@ -4714,7 +4315,6 @@ document.getElementById('btn-play').addEventListener('click',function(e){
     document.getElementById('chant-ball').classList.remove('playing');
     document.getElementById('chant-ball').textContent='誦';
     if(window.speechSynthesis)speechSynthesis.cancel();
-    stopKokoroPlayback();
     stopAudioChant();
   }else{
     // 若停在最後一句（念完狀態），先跳回開頭再繼續，避免立刻觸發 recordLap
@@ -4750,7 +4350,7 @@ document.getElementById('btn-tts').addEventListener('click',function(e){
   this.textContent=ttsEnabled?'🔊':'🔇';
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
   if(ttsEnabled&&chantActive)speak(sentences[currentIdx]);
-  else if(!ttsEnabled){if(window.speechSynthesis)speechSynthesis.cancel();stopKokoroPlayback();}
+  else if(!ttsEnabled&&window.speechSynthesis)speechSynthesis.cancel();
 });
 
 // ── 點擊閱讀區收起誦面板 ──
@@ -4761,11 +4361,8 @@ document.getElementById('reading-area').addEventListener('click',function(){
 // ── 跳頁函式 ──
 function updateLapBtn(){
   const isLast=pages.length>0&&currentPage===pages.length-1;
-  const rosaryMode=localStorage.getItem('nnjy_rosary')||'btn';
-  const useRosary=currentCategory==='佛號短咒'&&(rosaryMode==='h'||rosaryMode==='v');
   const lapBtn=document.getElementById('lap-btn');
-  // 音頻模式下最後一頁也顯示+1按鈕；非音頻模式需要停止播放才顯示
-  const showLap=isLast && currentTitle && !useRosary && (!isPlaying || audioMode);
+  const showLap=isLast && currentTitle && (!isPlaying || audioMode);
   if(lapBtn)lapBtn.style.display=showLap?'flex':'none';
 }
 function goNextPage(){
