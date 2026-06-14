@@ -1118,6 +1118,14 @@ body.reader-fullscreen #book-left{
 }
 #lib-panel,#lib-panel *{writing-mode:horizontal-tb !important;direction:ltr}
 #lib-panel.open{left:0}
+.lib-tab{
+  flex:1;padding:11px 4px;background:transparent;border:none;
+  border-bottom:2px solid transparent;margin-bottom:-2px;
+  color:var(--text3);font-family:var(--font-main);font-size:13px;
+  letter-spacing:.08em;cursor:pointer;transition:all .18s;
+}
+.lib-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.lib-tab:active{background:var(--bg3)}
 #lib-overlay{position:fixed;inset:0;z-index:299;background:rgba(0,0,0,.55);display:none}
 #lib-overlay.show{display:block}
 .lib-header{
@@ -1378,7 +1386,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.10</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.11</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1778,6 +1786,12 @@ body.reader-fullscreen #book-left{
       ☁ 匯入經典
     </button>
   </div>
+  <!-- 分類 Tab -->
+  <div id="lib-tabs" style="display:flex;border-bottom:2px solid var(--border);flex-shrink:0">
+    <button class="lib-tab active" data-cat="佛號短咒" onclick="setLibTab('佛號短咒')">經咒列表</button>
+    <button class="lib-tab" data-cat="佛教經典" onclick="setLibTab('佛教經典')">佛教經典</button>
+    <button class="lib-tab" data-cat="其他" onclick="setLibTab('其他')">其他</button>
+  </div>
   <div id="lib-list"></div>
 </div>
 
@@ -2050,28 +2064,27 @@ function deleteFromLib(title){
   markDirty();
   if(window._fbUser) window._fbPushCloud(window._fbUser.uid, true);
 }
+let _libTab='佛號短咒'; // 當前分類 tab
+function setLibTab(cat){
+  _libTab=cat;
+  document.querySelectorAll('.lib-tab').forEach(t=>{
+    t.classList.toggle('active',t.dataset.cat===cat);
+  });
+  renderLib();
+}
 function renderLib(){
   const lib=loadLib();
   const el=document.getElementById('lib-list');
-  if(!lib.length){
-    el.innerHTML='<div class="lib-empty">尚無儲存的經文<br>貼上後自動儲存</div>';return;
+  // 依當前 tab 過濾
+  const filtered=lib.filter(i=>(i.category||'其他')===_libTab);
+  if(!filtered.length){
+    const hint=_libTab==='其他'?'貼上或匯入後自動歸入此類':'尚無此分類的經文';
+    el.innerHTML='<div class="lib-empty">'+hint+'</div>';return;
   }
   const goals=loadGoals();
-  const sorted=[...lib].sort((a,b)=>{
-    const ca=CAT_ORDER[a.category??'其他']??2;
-    const cb=CAT_ORDER[b.category??'其他']??2;
-    if(ca!==cb)return ca-cb;
-    return strokeSort(a.title)-strokeSort(b.title);
-  });
-  let lastCat=null;
+  const sorted=[...filtered].sort((a,b)=>strokeSort(a.title)-strokeSort(b.title));
   el.innerHTML=sorted.map(i=>{
-    const cat=i.category||'其他';
-    let header='';
-    if(cat!==lastCat){
-      lastCat=cat;
-      header=`<div style="font-family:var(--font-main);font-size:11px;color:var(--text3);letter-spacing:.15em;padding:.6rem 1rem .3rem">${cat}</div>`;
-    }
-    return header+`<div class="lib-item" onclick="openFromLib('${encodeURIComponent(i.title)}')">
+    return `<div class="lib-item" onclick="openFromLib('${encodeURIComponent(i.title)}')">
       <div class="lib-item-info">
         <div class="lib-item-title">${i.title}</div>
         <div class="lib-item-meta" id="lib-meta-${encodeURIComponent(i.title)}">${i.date}</div>
@@ -2151,6 +2164,17 @@ function closeSettings(){
   document.getElementById('settings-overlay').classList.remove('show');
 }
 function openLib(){
+  // 若當前 tab 無內容，自動切換到第一個有內容的 tab
+  const lib=loadLib();
+  const cats=['佛號短咒','佛教經典','其他'];
+  const hasCur=lib.some(i=>(i.category||'其他')===_libTab);
+  if(!hasCur){
+    const firstWithContent=cats.find(c=>lib.some(i=>(i.category||'其他')===c));
+    if(firstWithContent) _libTab=firstWithContent;
+  }
+  document.querySelectorAll('.lib-tab').forEach(t=>{
+    t.classList.toggle('active',t.dataset.cat===_libTab);
+  });
   renderLib();
   document.getElementById('lib-panel').classList.add('open');
   document.getElementById('lib-overlay').classList.add('show');
