@@ -1395,7 +1395,7 @@ body.reader-fullscreen #book-left{
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.8</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.9</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1708,6 +1708,29 @@ body.reader-fullscreen #book-left{
     </div>
     <div style="margin-top:8px;font-size:12px;color:var(--text3);line-height:1.7">
       開啟後換句時裝置將朗讀該句文字。<br>需允許瀏覽器使用語音功能。
+    </div>
+    <div style="margin-top:12px">
+      <span class="toggle-label" style="font-size:13px">TTS 引擎</span>
+      <div class="mode-row" style="margin-top:6px">
+        <div class="mode-btn" id="tts-eng-browser" onclick="setTTSEngine('browser')">瀏覽器預設</div>
+        <div class="mode-btn" id="tts-eng-kokoro" onclick="setTTSEngine('kokoro')">Kokoro AI</div>
+      </div>
+    </div>
+    <div id="kokoro-voice-section" style="margin-top:10px;display:none">
+      <span class="toggle-label" style="font-size:13px">Kokoro 語音</span>
+      <div class="mode-row" style="margin-top:6px;flex-wrap:wrap;gap:6px">
+        <div class="mode-btn" id="kv-zf_xiaobei" onclick="setKokoroVoice('zf_xiaobei')">小北♀</div>
+        <div class="mode-btn" id="kv-zf_xiaoni" onclick="setKokoroVoice('zf_xiaoni')">小妮♀</div>
+        <div class="mode-btn" id="kv-zf_xiaoxian" onclick="setKokoroVoice('zf_xiaoxian')">小仙♀</div>
+        <div class="mode-btn" id="kv-zf_xiaoyan" onclick="setKokoroVoice('zf_xiaoyan')">小燕♀</div>
+        <div class="mode-btn" id="kv-zm_yunjian" onclick="setKokoroVoice('zm_yunjian')">雲健♂</div>
+        <div class="mode-btn" id="kv-zm_yunxi" onclick="setKokoroVoice('zm_yunxi')">雲希♂</div>
+        <div class="mode-btn" id="kv-zm_yunxiang" onclick="setKokoroVoice('zm_yunxiang')">雲翔♂</div>
+        <div class="mode-btn" id="kv-zm_yunyang" onclick="setKokoroVoice('zm_yunyang')">雲陽♂</div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.6">
+        Kokoro AI 語音品質較高，首次使用需下載約 160MB 模型（之後快取）。<br>中文支援為實驗性質，古典文言文及咒語效果可能有限。
+      </div>
     </div>
   </div>
 
@@ -2074,6 +2097,17 @@ body.reader-fullscreen #book-left{
 // ── 狀態 ──
 let sentences=[],currentIdx=0,isPlaying=false;
 let chantMode='auto',chantSpeed=300,ttsEnabled=false;
+// ── Kokoro TTS 引擎 ──
+let ttsEngine='browser'; // 'browser' | 'kokoro'
+let kokoroTTS=null;       // KokoroTTS instance
+let kokoroVoice='zf_xiaobei'; // 預設中文女聲
+let kokoroLoading=false;
+let kokoroAudioCtx=null;
+// 從 localStorage 恢復 TTS 引擎設定
+(function(){
+  ttsEngine=localStorage.getItem('nnjy_tts_engine')||'browser';
+  kokoroVoice=localStorage.getItem('nnjy_kokoro_voice')||'zf_xiaobei';
+})();
 let timer=null,chantActive=false,panelOpen=false;
 
 // ── 書庫（localStorage）──
@@ -2271,6 +2305,7 @@ function setFont(el){
 function openSettings(){
   document.getElementById('settings-panel').classList.add('open');
   document.getElementById('settings-overlay').classList.add('show');
+  updateTTSEngineUI();
 }
 function closeSettings(){
   document.getElementById('settings-panel').classList.remove('open');
@@ -2718,6 +2753,10 @@ async function fetchAudioManifest(){
     const resp=await fetch(AUDIO_BASE+'manifest.json?t='+Date.now());
     if(!resp.ok) return null;
     _audioManifest=await resp.json();
+    // CJK 相容字正規化 manifest keys
+    const norm={};
+    for(const[k,v]of Object.entries(_audioManifest)) norm[k.normalize('NFKC')]=v;
+    _audioManifest=norm;
     console.log('[Audio] manifest 載入：',Object.keys(_audioManifest).length,'筆');
     return _audioManifest;
   }catch(e){
@@ -2728,6 +2767,7 @@ async function fetchAudioManifest(){
 
 // 檢查並自動下載音頻包（含版本比對）
 async function checkAndDownloadAudio(title){
+  title=title.normalize('NFKC'); // CJK 相容字正規化
   try{
     // 取得 manifest 版本號與副檔名
     const manifestEntry=_audioManifest?.[title]||{};
@@ -2893,7 +2933,6 @@ function startAudioPoll(){
       }
     }
     if(idx>=0&&idx!==currentIdx){
-      console.log('[poll] t='+t.toFixed(2)+' oldIdx='+currentIdx+' newIdx='+idx+' text='+(sentences[idx]||'').substring(0,10));
       currentIdx=idx;
       if(sentencePageMap&&sentencePageMap[idx]!==undefined){
         const targetPage=sentencePageMap[idx];
@@ -3392,17 +3431,96 @@ function stopChant(){
   ball.classList.remove('playing');
   ball.textContent='誦';
   if(window.speechSynthesis)speechSynthesis.cancel();
+  stopKokoroPlayback();
   stopAudioChant();
 }
 
-function speak(text, onDone){
+// ── Kokoro TTS 引擎 ──
+async function initKokoro(showProgress){
+  if(kokoroTTS) return true;
+  if(kokoroLoading) return false;
+  kokoroLoading=true;
+  if(showProgress) showAudioProgress('載入 Kokoro TTS 模型…（首次約 160MB）',0);
+  try{
+    const mod=await import('https://esm.sh/kokoro-js@1.2.1');
+    if(showProgress) showAudioProgress('初始化 Kokoro TTS…',30);
+    const model_id='onnx-community/Kokoro-82M-v1.0-ONNX';
+    kokoroTTS=await mod.KokoroTTS.from_pretrained(model_id,{
+      dtype:'q8',
+      device:'wasm',
+      progress_callback:(p)=>{
+        if(showProgress && p.progress!==undefined){
+          const pct=Math.round(30+p.progress*0.65);
+          showAudioProgress('下載模型…',pct);
+        }
+      }
+    });
+    if(showProgress) hideAudioProgress();
+    kokoroLoading=false;
+    console.log('[Kokoro] 模型載入完成');
+    return true;
+  }catch(e){
+    console.error('[Kokoro] 載入失敗：',e);
+    if(showProgress) hideAudioProgress();
+    kokoroLoading=false;
+    showAudioToast('Kokoro TTS 載入失敗，已切回瀏覽器語音');
+    ttsEngine='browser';
+    saveTTSEngine();
+    updateTTSEngineUI();
+    return false;
+  }
+}
+
+let _kokoroPlaySrc=null; // current AudioBufferSourceNode
+function stopKokoroPlayback(){
+  if(_kokoroPlaySrc){try{_kokoroPlaySrc.stop();}catch(e){}_kokoroPlaySrc=null;}
+}
+
+async function speakKokoro(text, onDone){
+  if(!text){if(onDone)onDone();return;}
+  if(!kokoroTTS){
+    const ok=await initKokoro(true);
+    if(!ok){speakBrowser(text,onDone);return;}
+  }
+  try{
+    stopKokoroPlayback();
+    const speed=Math.max(0.5,Math.min(2.0,300/chantSpeed));
+    const result=await kokoroTTS.generate(text,{voice:kokoroVoice,speed});
+    // result.audio is Float32Array, result.sampling_rate is number
+    if(!kokoroAudioCtx) kokoroAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const sr=result.sampling_rate||24000;
+    const buf=kokoroAudioCtx.createBuffer(1,result.audio.length,sr);
+    buf.copyToChannel(result.audio,0);
+    const src=kokoroAudioCtx.createBufferSource();
+    src.buffer=buf;
+    src.connect(kokoroAudioCtx.destination);
+    _kokoroPlaySrc=src;
+    src.onended=()=>{_kokoroPlaySrc=null;if(onDone)onDone();};
+    src.start();
+  }catch(e){
+    console.error('[Kokoro] 生成失敗：',e);
+    _kokoroPlaySrc=null;
+    speakBrowser(text,onDone);
+  }
+}
+
+function speakBrowser(text, onDone){
   if(!window.speechSynthesis){if(onDone)onDone();return;}
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(stripBold(text));
+  const u=new SpeechSynthesisUtterance(text);
   u.lang='zh-TW';
   u.rate=Math.max(0.7,Math.min(1.2,1.2-(chantSpeed-100)/(500-100)*0.5));
   if(onDone)u.onend=onDone;
   speechSynthesis.speak(u);
+}
+
+function speak(text, onDone){
+  const clean=stripBold(text);
+  if(ttsEngine==='kokoro'){
+    speakKokoro(clean,onDone);
+  }else{
+    speakBrowser(clean,onDone);
+  }
 }
 
 // ── 速度分段 ──
@@ -3577,7 +3695,46 @@ function toggleTTS(){
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
   document.getElementById('btn-tts').textContent=ttsEnabled?'🔊':'🔇';
   if(ttsEnabled&&chantActive)speak(sentences[currentIdx]);
-  else if(!ttsEnabled&&window.speechSynthesis)speechSynthesis.cancel();
+  else if(!ttsEnabled){
+    if(window.speechSynthesis)speechSynthesis.cancel();
+    stopKokoroPlayback();
+  }
+}
+
+// ── TTS 引擎設定 ──
+function setTTSEngine(eng){
+  ttsEngine=eng;
+  saveTTSEngine();
+  updateTTSEngineUI();
+  // 切換到 Kokoro 時預載模型
+  if(eng==='kokoro' && !kokoroTTS && !kokoroLoading) initKokoro(true);
+}
+function setKokoroVoice(v){
+  kokoroVoice=v;
+  saveTTSEngine();
+  updateKokoroVoiceUI();
+}
+function saveTTSEngine(){
+  localStorage.setItem('nnjy_tts_engine',ttsEngine);
+  localStorage.setItem('nnjy_kokoro_voice',kokoroVoice);
+}
+function loadTTSEngine(){
+  ttsEngine=localStorage.getItem('nnjy_tts_engine')||'browser';
+  kokoroVoice=localStorage.getItem('nnjy_kokoro_voice')||'zf_xiaobei';
+}
+function updateTTSEngineUI(){
+  const browsers=document.getElementById('tts-eng-browser');
+  const kokoros=document.getElementById('tts-eng-kokoro');
+  if(browsers) browsers.classList.toggle('active',ttsEngine==='browser');
+  if(kokoros) kokoros.classList.toggle('active',ttsEngine==='kokoro');
+  const voiceSec=document.getElementById('kokoro-voice-section');
+  if(voiceSec) voiceSec.style.display=ttsEngine==='kokoro'?'block':'none';
+  updateKokoroVoiceUI();
+}
+function updateKokoroVoiceUI(){
+  document.querySelectorAll('[id^="kv-"]').forEach(el=>{
+    el.classList.toggle('active',el.id==='kv-'+kokoroVoice);
+  });
 }
 
 // ══ 統計資料 ══
@@ -4505,6 +4662,7 @@ document.getElementById('btn-calendar').addEventListener('click',()=>{showCalend
       ball.classList.remove('playing');
       ball.textContent='誦';
       if(window.speechSynthesis) speechSynthesis.cancel();
+      stopKokoroPlayback();
       stopAudioChant();
     } else {
       // 若停在最後一句，先跳回開頭
@@ -4551,6 +4709,7 @@ document.getElementById('btn-play').addEventListener('click',function(e){
     document.getElementById('chant-ball').classList.remove('playing');
     document.getElementById('chant-ball').textContent='誦';
     if(window.speechSynthesis)speechSynthesis.cancel();
+    stopKokoroPlayback();
     stopAudioChant();
   }else{
     // 若停在最後一句（念完狀態），先跳回開頭再繼續，避免立刻觸發 recordLap
@@ -4586,7 +4745,7 @@ document.getElementById('btn-tts').addEventListener('click',function(e){
   this.textContent=ttsEnabled?'🔊':'🔇';
   document.getElementById('tts-toggle').classList.toggle('on',ttsEnabled);
   if(ttsEnabled&&chantActive)speak(sentences[currentIdx]);
-  else if(!ttsEnabled&&window.speechSynthesis)speechSynthesis.cancel();
+  else if(!ttsEnabled){if(window.speechSynthesis)speechSynthesis.cancel();stopKokoroPlayback();}
 });
 
 // ── 點擊閱讀區收起誦面板 ──
@@ -4611,17 +4770,14 @@ function goNextPage(){
     for(const [k,v] of Object.entries(sentencePageMap)){
       if(v===nextP){firstIdx=parseInt(k);break;}
     }
-    console.log('[goNext] curPage='+currentPage+' nextP='+nextP+' firstIdx='+firstIdx+' sentence='+(sentences[firstIdx]||'').substring(0,10)+' mapKeys='+Object.keys(sentencePageMap).length);
     if(firstIdx>=0) currentIdx=firstIdx;
     else{
       const pg=pages[nextP];
       if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
-      console.log('[goNext] fallback currentIdx='+currentIdx);
     }
     showPage_num(nextP, true);
     updateProgress();
   }else{
-    console.log('[goNext] last page, wrap to 0');
     currentIdx=0;
     showPage_num(0, true);
     updateProgress();
@@ -4636,12 +4792,10 @@ function goPrevPage(){
     for(const [k,v] of Object.entries(sentencePageMap)){
       if(v===prevP){firstIdx=parseInt(k);break;}
     }
-    console.log('[goPrev] curPage='+currentPage+' prevP='+prevP+' firstIdx='+firstIdx+' sentence='+(sentences[firstIdx]||'').substring(0,10));
     if(firstIdx>=0) currentIdx=firstIdx;
     else{
       const pg=pages[prevP];
       if(pg) currentIdx=sentencePageMap2sentIdx(pg.startOffset);
-      console.log('[goPrev] fallback currentIdx='+currentIdx);
     }
     showPage_num(prevP, true);
     updateProgress();
@@ -4666,7 +4820,6 @@ function syncAudioToCurrentIdx(){
   const mySeq=++_syncSeqId;
   const wasPlaying=!sutraAudioPlayer.paused;
   const beforeTime=sutraAudioPlayer.currentTime;
-  console.log('[sync] BEFORE: curTime='+beforeTime.toFixed(2)+' currentIdx='+currentIdx+' → seeking to seg.idx='+seg.idx+' seg.start='+seg.start.toFixed(2)+' text='+(sentences[seg.idx]||'').substring(0,15));
   stopAudioPoll();
   sutraAudioPlayer.pause();
   sutraAudioPlayer.currentTime=seg.start+0.01;
