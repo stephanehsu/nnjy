@@ -1463,7 +1463,7 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.13</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.14</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1738,12 +1738,10 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
 
   <div class="s-section">
     <span class="s-label">介面文字大小</span>
-    <div class="mode-row" id="ui-size-row" style="margin-top:4px;gap:5px">
-      <div class="mode-btn" data-uisize="0.85" onclick="setUISize(0.85)" style="padding:10px 2px;letter-spacing:0;font-size:12px">特小</div>
-      <div class="mode-btn" data-uisize="0.93" onclick="setUISize(0.93)" style="padding:10px 2px;letter-spacing:0;font-size:12px">小</div>
-      <div class="mode-btn active" data-uisize="1" onclick="setUISize(1)" style="padding:10px 2px;letter-spacing:0;font-size:12px">標準</div>
-      <div class="mode-btn" data-uisize="1.1" onclick="setUISize(1.1)" style="padding:10px 2px;letter-spacing:0;font-size:12px">大</div>
-      <div class="mode-btn" data-uisize="1.22" onclick="setUISize(1.22)" style="padding:10px 2px;letter-spacing:0;font-size:12px">特大</div>
+    <div class="mode-row" id="ui-size-row" style="margin-top:4px">
+      <div class="mode-btn active" data-uisize="1" onclick="setUISize(1)">標準</div>
+      <div class="mode-btn" data-uisize="1.12" onclick="setUISize(1.12)">大</div>
+      <div class="mode-btn" data-uisize="1.26" onclick="setUISize(1.26)">特大</div>
     </div>
     <div style="margin-top:8px;font-size:12px;color:var(--text3);line-height:1.7">
       調整介面文字（頂欄、選單、按鈕等）大小，不影響上方經文字級。
@@ -4742,8 +4740,14 @@ async function doSync(){
 
 // ── 還原主題 ──
 applyTheme(localStorage.getItem('nnjy_theme') || '');
-// ── 還原介面字級 ──
-setUISize(parseFloat(localStorage.getItem('nnjy_ui_size')) || 1);
+// ── 還原介面字級（舊版 5 檔值自動對應到最近的 3 檔）──
+(function(){
+  let s=parseFloat(localStorage.getItem('nnjy_ui_size'))||1;
+  const levels=[1,1.12,1.26];
+  // 找最接近的有效檔位
+  s=levels.reduce((a,b)=>Math.abs(b-s)<Math.abs(a-s)?b:a,levels[0]);
+  setUISize(s);
+})();
 </script>
 </body>
 </html>
