@@ -518,6 +518,7 @@ onAuthStateChanged(auth, user => {
   --font-main:'LXGW WenKai TC','Noto Serif TC',serif;
   --font-ui:'Noto Serif TC',serif;
   --tr:0.38s cubic-bezier(0.4,0,0.2,1);
+  --ui-zoom:1;          /* 介面字級縮放（五檔） */
 }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
@@ -529,6 +530,29 @@ html,body{
   font-family:var(--font-ui);
   transition:background var(--tr),color var(--tr);
   -webkit-text-size-adjust:100%;
+}
+
+/* ── 介面字級縮放（五檔；閱讀經文不受影響）── */
+#topbar,
+#welcome,
+#stats-page,
+#calendar-page,
+#day-modal-overlay,
+#settings-panel,
+#settings-overlay,
+#lib-panel,
+#lib-overlay,
+#chant-float,
+#install-bar,
+#install-guide-overlay,
+#page-roller-overlay,
+#new-round-overlay,
+#sutra-import-modal-overlay,
+#goal-modal-overlay,
+#delete-modal-overlay,
+#import-modal-overlay,
+#goal-flash{
+  zoom:var(--ui-zoom);
 }
 
 /* 全螢幕返回鈕 */
@@ -1439,7 +1463,7 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.12</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.13</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1698,7 +1722,7 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
   </div>
 
   <div class="s-section">
-    <span class="s-label">字體大小</span>
+    <span class="s-label">經文字體大小</span>
     <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
       <button onclick="adjustFontSize(-1)"
         style="width:36px;height:36px;border-radius:50%;background:none;
@@ -1709,6 +1733,20 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
         style="width:36px;height:36px;border-radius:50%;background:none;
                border:1px solid var(--accent);color:var(--accent);
                font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center">＋</button>
+    </div>
+  </div>
+
+  <div class="s-section">
+    <span class="s-label">介面文字大小</span>
+    <div class="mode-row" id="ui-size-row" style="margin-top:4px;gap:5px">
+      <div class="mode-btn" data-uisize="0.85" onclick="setUISize(0.85)" style="padding:10px 2px;letter-spacing:0;font-size:12px">特小</div>
+      <div class="mode-btn" data-uisize="0.93" onclick="setUISize(0.93)" style="padding:10px 2px;letter-spacing:0;font-size:12px">小</div>
+      <div class="mode-btn active" data-uisize="1" onclick="setUISize(1)" style="padding:10px 2px;letter-spacing:0;font-size:12px">標準</div>
+      <div class="mode-btn" data-uisize="1.1" onclick="setUISize(1.1)" style="padding:10px 2px;letter-spacing:0;font-size:12px">大</div>
+      <div class="mode-btn" data-uisize="1.22" onclick="setUISize(1.22)" style="padding:10px 2px;letter-spacing:0;font-size:12px">特大</div>
+    </div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text3);line-height:1.7">
+      調整介面文字（頂欄、選單、按鈕等）大小，不影響上方經文字級。
     </div>
   </div>
 
@@ -2230,6 +2268,12 @@ function applyTheme(t){
   // 卡片 active 樣式
   document.querySelectorAll('[data-theme-card]').forEach(c=>
     c.classList.toggle('active', c.dataset.themeCard === (t||'')));
+}
+function setUISize(scale){
+  document.documentElement.style.setProperty('--ui-zoom', scale);
+  localStorage.setItem('nnjy_ui_size', scale);
+  document.querySelectorAll('#ui-size-row .mode-btn').forEach(b=>
+    b.classList.toggle('active', parseFloat(b.dataset.uisize)===scale));
 }
 function openSettings(){
   document.getElementById('settings-panel').classList.add('open');
@@ -4698,6 +4742,8 @@ async function doSync(){
 
 // ── 還原主題 ──
 applyTheme(localStorage.getItem('nnjy_theme') || '');
+// ── 還原介面字級 ──
+setUISize(parseFloat(localStorage.getItem('nnjy_ui_size')) || 1);
 </script>
 </body>
 </html>
