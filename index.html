@@ -513,6 +513,7 @@ onAuthStateChanged(auth, user => {
   --reader-text:#2a1a0a;      /* 經文文字 */
   --reader-passed:#9a8060;    /* 已念過的句子 */
   --reader-active:#8b1a1a;    /* 正在念／strong 高亮 */
+  --reader-active-bg:transparent; /* 高亮句背景 */
   --reader-title:#5a3e28;     /* 側邊書名 */
   --reader-pagenum:#7a5a3a;   /* 頁碼 */
   --font-main:'LXGW WenKai TC','Noto Serif TC',serif;
@@ -798,7 +799,7 @@ body.reader-fullscreen #book-left{
   flex-shrink:0;height:44px;
   display:flex;align-items:center;justify-content:center;
   border-top:1px solid rgba(139,104,64,0.3);
-  color:#7a5a3a;font-size:18px;cursor:pointer;
+  color:var(--accent);font-size:18px;cursor:pointer;
 }
 #page-roller-close:active{color:#c8a870}
 
@@ -872,7 +873,7 @@ body.reader-fullscreen #book-left{
 
 /* 書卷風格主題（覆蓋 theme 變數） */
 #reader .sentence{color:var(--reader-text)}
-#reader .sentence.active{color:var(--reader-active);background:transparent}
+#reader .sentence.active{color:var(--reader-active);background:var(--reader-active-bg)}
 #reader .sentence.passed{color:var(--reader-passed)}
 #reader .sentence strong{
   font-weight:700;
@@ -1393,6 +1394,46 @@ body[data-theme="liuli"] #book-frame::before{
   background-size:50px 50px;
 }
 body[data-theme="liuli"] #text-container{position:relative;z-index:1}
+
+/* ══ 唐卡度母（綠）主題 ══ */
+body[data-theme="tara"]{
+  /* 介面色（綠底） */
+  --bg:#9bc4a6;
+  --bg2:#86b394;          /* 深一階：頂欄／面板 */
+  --bg3:#aed2b6;          /* 輸入框／選項底 */
+  --text:#15306e;         /* 主文字：深藍 */
+  --text2:#27468f;        /* 次要文字 */
+  --text3:#1d55cc;        /* 提示／圖示：鈷藍 */
+  --accent:#bf6a09;       /* 強調：深琥珀（淺綠底上文字才突出）*/
+  --accent2:#ffd23d;      /* 第二強調：亮金（深底上用）*/
+  --hl-bg:rgba(191,106,9,.15);
+  --hl-text:#bf6a09;
+  --border:rgba(29,85,204,.6);     /* 鈷藍邊 */
+  --border2:rgba(29,85,204,.3);
+  /* 閱讀頁（書框內底是深色，文字轉象牙白） */
+  --reader-bg:#9bc4a6;             /* 書框外層＝綠 */
+  --reader-frame:#1d55cc;          /* 書框邊＝鈷藍 */
+  --reader-paper:rgba(0,0,0,.22);  /* 書框內底＝深色半透明 */
+  --reader-text:#f3eedc;           /* 未念句＝象牙白 */
+  --reader-passed:#bfe0d6;         /* 已念過＝亮淡青 */
+  --reader-active:#ffce4a;         /* 正在念＝亮琥珀（深底上） */
+  --reader-active-bg:transparent;  /* 高亮背景透明 */
+  --reader-title:#cfe6d6;
+  --reader-pagenum:#a85e06;        /* 頁碼＝深琥珀（淺綠底上才突出） */
+}
+/* 唐卡度母：高亮句加細陰影（深底上的亮琥珀更清楚）*/
+body[data-theme="tara"] #reader .sentence.active,
+body[data-theme="tara"] #reader .sentence.active strong{
+  text-shadow:0 1px 2px rgba(0,0,0,.45);
+}
+/* 唐卡度母：頂欄標題與按鈕改深藍 */
+body[data-theme="tara"] .topbar-title{color:#15306e}
+body[data-theme="tara"] .tb-btn{color:#15306e}
+body[data-theme="tara"] .tb-btn .tb-icon,
+body[data-theme="tara"] .tb-btn .tb-label{color:#15306e}
+body[data-theme="tara"] .tb-btn:active{color:#27468f}
+body[data-theme="tara"] .tb-btn:active .tb-icon,
+body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
 </style>
 <audio id="audio-mokugyo" preload="auto">
   <source src="data:audio/mp3;base64,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" type="audio/mp3">
@@ -1404,7 +1445,7 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
 <body>
 <script>
 // 盡早套用主題，避免閃爍
-(function(){try{if(localStorage.getItem('nnjy_theme')==='liuli'){document.body.setAttribute('data-theme','liuli');var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content','#1d4365');}}catch(e){}})();
+(function(){try{var t=localStorage.getItem('nnjy_theme');if(t){document.body.setAttribute('data-theme',t);var c={liuli:'#1d4365',tara:'#86b394'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();
 </script>
 
 <!-- 頂部工具列 -->
@@ -1463,7 +1504,7 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.15</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.23</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1519,7 +1560,7 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
         </div>
         <div id="reading-area">
           <div id="text-container"></div>
-          <div id="page-indicator" onclick="openPageRoller()" style="position:absolute;bottom:8px;left:8px;font-size:12px;color:#8b5e2a;font-family:var(--font-main);letter-spacing:.05em;writing-mode:horizontal-tb;pointer-events:auto;z-index:10;cursor:pointer;padding:5px 9px;border-radius:6px;transition:background .15s,color .15s;background:rgba(200,140,60,0.13);border:1px solid rgba(180,120,40,0.35);display:flex;align-items:center;gap:5px;user-select:none;-webkit-user-select:none" title="點擊跳頁"><span style="font-size:13px;opacity:.8">☰</span><span id="page-indicator-text">1 / 1</span></div>
+          <div id="page-indicator" onclick="openPageRoller()" style="position:absolute;bottom:8px;left:8px;font-size:12px;color:var(--reader-active);font-family:var(--font-main);letter-spacing:.05em;writing-mode:horizontal-tb;pointer-events:auto;z-index:10;cursor:pointer;padding:5px 9px;border-radius:6px;transition:background .15s,color .15s;background:var(--hl-bg);border:1px solid var(--reader-active);display:flex;align-items:center;gap:5px;user-select:none;-webkit-user-select:none" title="點擊跳頁"><span style="font-size:13px;opacity:.8">☰</span><span id="page-indicator-text">1 / 1</span></div>
         </div>
         <!-- 右箭頭（上一頁，直排往右） -->
         <div id="page-next-zone" class="page-zone">
@@ -1687,6 +1728,9 @@ body[data-theme="liuli"] #text-container{position:relative;z-index:1}
       </div>
       <div class="font-item" data-theme-card="liuli" onclick="applyTheme('liuli')">
         <span class="fp" style="width:18px;height:18px;border-radius:50%;background:#2a5d8a;border:1px solid var(--border);display:inline-block;vertical-align:middle"></span>藥師琉璃
+      </div>
+      <div class="font-item" data-theme-card="tara" onclick="applyTheme('tara')">
+        <span class="fp" style="width:18px;height:18px;border-radius:50%;background:#9bc4a6;border:2px solid #1d55cc;display:inline-block;vertical-align:middle"></span>唐卡度母
       </div>
     </div>
   </div>
@@ -2257,12 +2301,13 @@ function setFont(el){
   rebuildPages();
 }
 function applyTheme(t){
-  if(t==='liuli'){ document.body.setAttribute('data-theme','liuli'); }
+  if(t){ document.body.setAttribute('data-theme',t); }
   else { document.body.removeAttribute('data-theme'); }
   localStorage.setItem('nnjy_theme', t || '');
   // 更新 meta theme-color
+  const themeColors={liuli:'#1d4365',tara:'#86b394'};
   document.querySelector('meta[name="theme-color"]')
-    .setAttribute('content', t==='liuli' ? '#1d4365' : '#3a2510');
+    .setAttribute('content', themeColors[t] || '#3a2510');
   // 卡片 active 樣式
   document.querySelectorAll('[data-theme-card]').forEach(c=>
     c.classList.toggle('active', c.dataset.themeCard === (t||'')));
