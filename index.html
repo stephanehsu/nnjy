@@ -1395,23 +1395,23 @@ body[data-theme="liuli"] #book-frame::before{
 }
 body[data-theme="liuli"] #text-container{position:relative;z-index:1}
 
-/* ══ 唐卡度母（綠）主題 ══ */
+/* ══ 唐卡度母（綠·E案）主題 ══ */
 body[data-theme="tara"]{
-  /* 介面色（綠底） */
-  --bg:#9bc4a6;
-  --bg2:#86b394;          /* 深一階：頂欄／面板 */
-  --bg3:#aed2b6;          /* 輸入框／選項底 */
+  /* 介面色（淡青瓷底） */
+  --bg:#c6d6c0;
+  --bg2:#b4c8ad;          /* 深一階：頂欄／面板 */
+  --bg3:#d6e0cd;          /* 輸入框／選項底 */
   --text:#15306e;         /* 主文字：深藍 */
   --text2:#27468f;        /* 次要文字 */
   --text3:#1d55cc;        /* 提示／圖示：鈷藍 */
-  --accent:#bf6a09;       /* 強調：深琥珀（淺綠底上文字才突出）*/
-  --accent2:#ffd23d;      /* 第二強調：亮金（深底上用）*/
+  --accent:#bf6a09;       /* 強調：深琥珀 */
+  --accent2:#ffd23d;      /* 亮琥珀（限深底高亮用） */
   --hl-bg:rgba(191,106,9,.15);
   --hl-text:#bf6a09;
   --border:rgba(29,85,204,.6);     /* 鈷藍邊 */
   --border2:rgba(29,85,204,.3);
   /* 閱讀頁（書框內底是深色，文字轉象牙白） */
-  --reader-bg:#9bc4a6;             /* 書框外層＝綠 */
+  --reader-bg:#c6d6c0;             /* 書框外層＝青瓷 */
   --reader-frame:#1d55cc;          /* 書框邊＝鈷藍 */
   --reader-paper:rgba(0,0,0,.22);  /* 書框內底＝深色半透明 */
   --reader-text:#f3eedc;           /* 未念句＝象牙白 */
@@ -1419,12 +1419,17 @@ body[data-theme="tara"]{
   --reader-active:#ffce4a;         /* 正在念＝亮琥珀（深底上） */
   --reader-active-bg:transparent;  /* 高亮背景透明 */
   --reader-title:#cfe6d6;
-  --reader-pagenum:#a85e06;        /* 頁碼＝深琥珀（淺綠底上才突出） */
+  --reader-pagenum:#a85e06;        /* 頁碼＝深琥珀（淺青瓷底上才突出） */
 }
 /* 唐卡度母：高亮句加細陰影（深底上的亮琥珀更清楚）*/
 body[data-theme="tara"] #reader .sentence.active,
 body[data-theme="tara"] #reader .sentence.active strong{
   text-shadow:0 1px 2px rgba(0,0,0,.45);
+}
+/* 唐卡度母：主鈕填色態用象牙白字（深琥珀底上對比最強）*/
+body[data-theme="tara"] .main-btn.primary:active{color:#f3eedc}
+@media(hover:hover){
+  body[data-theme="tara"] .main-btn.primary:hover{color:#f3eedc}
 }
 /* 唐卡度母：頂欄標題與按鈕改深藍 */
 body[data-theme="tara"] .topbar-title{color:#15306e}
@@ -1445,7 +1450,7 @@ body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
 <body>
 <script>
 // 盡早套用主題，避免閃爍
-(function(){try{var t=localStorage.getItem('nnjy_theme');if(t){document.body.setAttribute('data-theme',t);var c={liuli:'#1d4365',tara:'#86b394'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();
+(function(){try{var t=localStorage.getItem('nnjy_theme');if(t){document.body.setAttribute('data-theme',t);var c={liuli:'#1d4365',tara:'#b4c8ad'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();
 </script>
 
 <!-- 頂部工具列 -->
@@ -1504,7 +1509,7 @@ body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.23</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.24</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1730,7 +1735,7 @@ body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
         <span class="fp" style="width:18px;height:18px;border-radius:50%;background:#2a5d8a;border:1px solid var(--border);display:inline-block;vertical-align:middle"></span>藥師琉璃
       </div>
       <div class="font-item" data-theme-card="tara" onclick="applyTheme('tara')">
-        <span class="fp" style="width:18px;height:18px;border-radius:50%;background:#9bc4a6;border:2px solid #1d55cc;display:inline-block;vertical-align:middle"></span>唐卡度母
+        <span class="fp" style="width:18px;height:18px;border-radius:50%;background:#c6d6c0;border:2px solid #1d55cc;display:inline-block;vertical-align:middle"></span>唐卡度母
       </div>
     </div>
   </div>
@@ -2305,7 +2310,7 @@ function applyTheme(t){
   else { document.body.removeAttribute('data-theme'); }
   localStorage.setItem('nnjy_theme', t || '');
   // 更新 meta theme-color
-  const themeColors={liuli:'#1d4365',tara:'#86b394'};
+  const themeColors={liuli:'#1d4365',tara:'#b4c8ad'};
   document.querySelector('meta[name="theme-color"]')
     .setAttribute('content', themeColors[t] || '#3a2510');
   // 卡片 active 樣式
