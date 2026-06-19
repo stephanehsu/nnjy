@@ -693,11 +693,12 @@ body.reader-fullscreen #book-left{
   -webkit-user-select:none;user-select:none;
 }
 .main-btn:active{background:var(--bg3);border-color:var(--accent);color:var(--accent)}
-.main-btn.primary{border-color:var(--accent);color:var(--accent)}
-.main-btn.primary:active{background:var(--accent);color:var(--bg)}
+/* 主按鈕（貼入新經文／加入經文庫）— accent 底白字 */
+.main-btn.primary{background:var(--accent);border-color:var(--accent);color:#f3eedc}
+.main-btn.primary:active{background:#a85e06;border-color:#a85e06;color:#f3eedc}
 @media(hover:hover){
   .main-btn:hover{background:var(--bg3);border-color:var(--accent);color:var(--accent)}
-  .main-btn.primary:hover{background:var(--accent);color:var(--bg)}
+  .main-btn.primary:hover{background:#a85e06;border-color:#a85e06;color:#f3eedc}
 }
 .ornament-line{font-size:12px;color:var(--text3);letter-spacing:.4em;text-align:center;padding:.25rem 0}
 
@@ -1059,7 +1060,7 @@ body.reader-fullscreen #book-left{
   color:var(--text2);font-size:14px;letter-spacing:.08em;
   transition:all .18s;display:flex;align-items:center;gap:10px;
 }
-.font-item:active,.font-item.active{border-color:var(--accent);color:var(--accent);background:var(--bg2)}
+.font-item:active,.font-item.active{border-color:var(--accent);color:#f3eedc;background:var(--accent)}
 .fp{font-size:20px;min-width:28px;text-align:center}
 
 /* 滑桿 */
@@ -1085,7 +1086,7 @@ body.reader-fullscreen #book-left{
   font-family:var(--font-main);line-height:1.5;transition:all .18s;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
 }
-.speed-chip:active,.speed-chip.active{border-color:var(--accent);color:var(--accent);background:var(--bg2)}
+.speed-chip:active,.speed-chip.active{border-color:var(--accent);color:#f3eedc;background:var(--accent)}
 
 /* 模式 */
 .mode-row{display:flex;gap:8px}
@@ -1096,7 +1097,7 @@ body.reader-fullscreen #book-left{
   letter-spacing:.1em;text-align:center;transition:all .18s;
   display:flex;align-items:center;justify-content:center;
 }
-.mode-btn:active,.mode-btn.active{border-color:var(--accent);color:var(--accent);background:var(--bg2)}
+.mode-btn:active,.mode-btn.active{border-color:var(--accent);color:#f3eedc;background:var(--accent)}
 
 /* toggle */
 .toggle-row{display:flex;align-items:center;justify-content:space-between;min-height:44px}
@@ -1269,12 +1270,12 @@ body.reader-fullscreen #book-left{
 .sutra-lib-size{font-size:11px;color:var(--text3);margin-top:2px}
 .sutra-lib-import{
   flex-shrink:0;padding:7px 14px;border-radius:4px;
-  background:transparent;border:1px solid var(--accent);
-  color:var(--accent);font-family:var(--font-main);
+  background:var(--accent);border:1px solid var(--accent);
+  color:#f3eedc;font-family:var(--font-main);
   font-size:13px;cursor:pointer;letter-spacing:.08em;
   transition:all .18s;white-space:nowrap;
 }
-.sutra-lib-import:active{background:var(--accent);color:var(--bg)}
+.sutra-lib-import:active{background:#a85e06;border-color:#a85e06;color:#f3eedc}
 .sutra-lib-preview{
   border-top:1px solid var(--border2);
   padding:.75rem 1rem;
@@ -1426,11 +1427,6 @@ body[data-theme="tara"] #reader .sentence.active,
 body[data-theme="tara"] #reader .sentence.active strong{
   text-shadow:0 1px 2px rgba(0,0,0,.45);
 }
-/* 唐卡度母：主鈕填色態用象牙白字（深琥珀底上對比最強）*/
-body[data-theme="tara"] .main-btn.primary:active{color:#f3eedc}
-@media(hover:hover){
-  body[data-theme="tara"] .main-btn.primary:hover{color:#f3eedc}
-}
 /* 唐卡度母：頂欄標題與按鈕改深藍 */
 body[data-theme="tara"] .topbar-title{color:#15306e}
 body[data-theme="tara"] .tb-btn{color:#15306e}
@@ -1509,7 +1505,7 @@ body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.24</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.27</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1744,8 +1740,8 @@ body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
     <span class="s-label">新增經文</span>
     <button onclick="closeSettings();openImportModal()"
       style="width:100%;min-height:48px;border-radius:4px;
-             background:transparent;border:1px solid var(--accent);
-             color:var(--accent);font-family:var(--font-main);
+             background:var(--accent);border:1px solid var(--accent);
+             color:#f3eedc;font-family:var(--font-main);
              font-size:14px;letter-spacing:.15em;cursor:pointer;
              display:flex;align-items:center;justify-content:center;gap:8px;transition:all .18s">
       ＋ 貼上經文
@@ -1929,8 +1925,8 @@ body[data-theme="tara"] .tb-btn:active .tb-label{color:#27468f}
   <div style="padding:.75rem 1rem;border-bottom:2px solid var(--border)">
     <button onclick="openSutraImportModal()"
       style="width:100%;min-height:44px;border-radius:4px;
-             background:transparent;border:1px solid var(--border);
-             color:var(--text2);font-family:var(--font-main);
+             background:var(--accent);border:1px solid var(--accent);
+             color:#f3eedc;font-family:var(--font-main);
              font-size:13px;letter-spacing:.1em;cursor:pointer;
              display:flex;align-items:center;justify-content:center;gap:6px;transition:all .18s">
       ☁ 匯入經典
