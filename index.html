@@ -1445,15 +1445,15 @@ body[data-theme="mandala"]{
   --text:#efe6ce;          /* 主文字：暖金白 */
   --text2:#cbbd9c;         /* 次要文字：淡金 */
   --text3:#c7a45f;         /* 提示／圖示：織錦金 */
-  --accent:#c14a2a;        /* 強調：朱砂紅（唐卡礦物顏料調）*/
+  --accent:#c75a22;        /* 強調：橘朱砂（對齊唐卡龍紋）*/
   --accent2:#f0cf8a;       /* 柔金（高亮用） */
-  --hl-bg:rgba(193,74,42,.18);
-  --hl-text:#d9603c;
+  --hl-bg:rgba(199,90,34,.18);
+  --hl-text:#dd7440;
   --border:rgba(199,164,95,.65);   /* 織錦金邊 */
   --border2:rgba(199,164,95,.3);
   /* 閱讀頁（黑底，雙裱框見下） */
   --reader-bg:#17140f;
-  --reader-frame:#c14a2a;              /* 書框邊＝朱砂紅 */
+  --reader-frame:#c75a22;              /* 書框邊＝橘朱砂 */
   --reader-paper:rgba(255,244,214,.045);
   --reader-text:#d9cfb8;               /* 未念句＝暖灰白（柔和不刺眼）*/
   --reader-passed:#7d7462;             /* 已念過＝暗金灰 */
@@ -1476,7 +1476,7 @@ body[data-theme="mandala"] #reader .sentence.active strong{
 /* 曼陀羅：雙裱框（外朱紅裱 3px ＋ 內織錦金線 1px）*/
 body[data-theme="mandala"] #book-frame{
   border:3px solid var(--reader-frame);
-  background:rgba(193,74,42,.12);
+  background:rgba(199,90,34,.12);
   box-shadow:none;
   padding:3px;
   position:relative;
@@ -1491,6 +1491,28 @@ body[data-theme="mandala"] .sutra-lib-import,
 body[data-theme="mandala"] .font-item.active,
 body[data-theme="mandala"] .mode-btn.active,
 body[data-theme="mandala"] .speed-chip.active{color:#f6ead2}
+
+/* ══ 柔和模式（護眼：文字與背景對比降一階）══ */
+/* 米黃宣紙 */
+body[data-soft="1"]{
+  --text:#4a3a24;--text2:#5c4a32;
+  --reader-text:#4e3d28;--reader-passed:#a8927a;--reader-active:#a04030;
+}
+/* 藥師琉璃 */
+body[data-theme="liuli"][data-soft="1"]{
+  --text:#d8d0bc;--text2:#c8bea6;
+  --reader-text:#ddd5c2;--reader-passed:#7e97ab;--reader-active:#d4b876;
+}
+/* 唐卡度母 */
+body[data-theme="tara"][data-soft="1"]{
+  --text:#2c4478;--text2:#3d5490;
+  --reader-text:#e2dac6;--reader-passed:#8a9fa4;--reader-active:#e8c057;
+}
+/* 黑唐卡曼陀羅 */
+body[data-theme="mandala"][data-soft="1"]{
+  --text:#d2c7ae;--text2:#b5a988;
+  --reader-text:#c6bca6;--reader-passed:#6e6656;--reader-active:#dcbf80;
+}
 </style>
 <audio id="audio-mokugyo" preload="auto">
   <source src="data:audio/mp3;base64,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" type="audio/mp3">
@@ -1502,8 +1524,13 @@ body[data-theme="mandala"] .speed-chip.active{color:#f6ead2}
 <body>
 <script>
 // 盡早套用主題，避免閃爍
-(function(){try{var t=localStorage.getItem('nnjy_theme');if(t){document.body.setAttribute('data-theme',t);var c={liuli:'#1d4365',tara:'#b4c8ad',mandala:'#0e0c09'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}}catch(e){}})();
+(function(){try{var t=localStorage.getItem('nnjy_theme');if(t){document.body.setAttribute('data-theme',t);var c={liuli:'#1d4365',tara:'#b4c8ad',mandala:'#0e0c09'}[t];var m=document.querySelector('meta[name="theme-color"]');if(m&&c)m.setAttribute('content',c);}
+// 盡早套用柔和模式，避免閃爍
+if(localStorage.getItem('nnjy_soft')==='1')document.body.setAttribute('data-soft','1');
+}catch(e){}})();
 </script>
+<!-- 護眼暖色濾鏡層 -->
+<div id="warm-filter" style="position:fixed;inset:0;background:#ff9329;opacity:0;pointer-events:none;z-index:99999;mix-blend-mode:multiply;transition:opacity .3s"></div>
 
 <!-- 頂部工具列 -->
 <div id="topbar">
@@ -1561,7 +1588,7 @@ body[data-theme="mandala"] .speed-chip.active{color:#f6ead2}
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.30</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.32</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1791,6 +1818,27 @@ body[data-theme="mandala"] .speed-chip.active{color:#f6ead2}
       </div>
       <div class="font-item" data-theme-card="mandala" onclick="applyTheme('mandala')">
         <span class="fp" style="width:18px;height:18px;border-radius:50%;background:#17140f;border:2px solid #c7a45f;display:inline-block;vertical-align:middle"></span>黑唐卡曼陀羅
+      </div>
+    </div>
+  </div>
+
+  <div class="s-section">
+    <span class="s-label">護眼</span>
+    <div class="toggle-row">
+      <span class="toggle-label">柔和模式（降低對比）</span>
+      <div class="toggle" id="soft-toggle" onclick="toggleSoftMode()"></div>
+    </div>
+    <div style="margin-top:14px">
+      <span class="toggle-label" style="font-size:13px">暖色濾鏡（降藍光）</span>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <span style="font-size:11px;color:var(--text3)">關</span>
+        <input type="range" id="warm-slider" min="0" max="100" value="0" step="5"
+          oninput="setWarmFilter(this.value)"
+          style="flex:1;accent-color:var(--accent)">
+        <span style="font-size:11px;color:var(--text3)">強</span>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text3);line-height:1.6">
+        疊一層琥珀色減少藍光刺激，適合夜間或長時間誦讀。
       </div>
     </div>
   </div>
@@ -2378,9 +2426,33 @@ function setUISize(scale){
   document.querySelectorAll('#ui-size-row .mode-btn').forEach(b=>
     b.classList.toggle('active', parseFloat(b.dataset.uisize)===scale));
 }
+// ── 護眼：暖色濾鏡 ──
+function setWarmFilter(v){
+  v=parseInt(v)||0;
+  // 0~100 對應 opacity 0~0.35（太濃會影響閱讀）
+  const el=document.getElementById('warm-filter');
+  if(el)el.style.opacity=(v/100*0.35).toFixed(3);
+  localStorage.setItem('nnjy_warm',v);
+  const s=document.getElementById('warm-slider');
+  if(s&&s.value!=v)s.value=v;
+}
+// ── 護眼：柔和模式 ──
+function toggleSoftMode(){
+  const on=document.body.getAttribute('data-soft')==='1';
+  if(on)document.body.removeAttribute('data-soft');
+  else document.body.setAttribute('data-soft','1');
+  localStorage.setItem('nnjy_soft',on?'0':'1');
+  const t=document.getElementById('soft-toggle');
+  if(t)t.classList.toggle('on',!on);
+}
 function openSettings(){
   document.getElementById('settings-panel').classList.add('open');
   document.getElementById('settings-overlay').classList.add('show');
+  // 同步護眼 UI 狀態
+  const t=document.getElementById('soft-toggle');
+  if(t)t.classList.toggle('on',document.body.getAttribute('data-soft')==='1');
+  const s=document.getElementById('warm-slider');
+  if(s)s.value=parseInt(localStorage.getItem('nnjy_warm'))||0;
 }
 function closeSettings(){
   document.getElementById('settings-panel').classList.remove('open');
@@ -4853,6 +4925,8 @@ applyTheme(localStorage.getItem('nnjy_theme') || '');
   s=levels.reduce((a,b)=>Math.abs(b-s)<Math.abs(a-s)?b:a,levels[0]);
   setUISize(s);
 })();
+// ── 還原護眼設定 ──
+setWarmFilter(parseInt(localStorage.getItem('nnjy_warm'))||0);
 </script>
 </body>
 </html>
