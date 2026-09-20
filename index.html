@@ -954,9 +954,8 @@ body.reader-fullscreen #book-left{
   width:220px;opacity:1;pointer-events:auto;
   padding:0 8px 0 12px;gap:6px;
 }
-#float-speed-slider::-webkit-slider-thumb{
-  -webkit-appearance:none;width:18px;height:18px;
-  border-radius:50%;background:var(--accent);cursor:pointer;
+#float-speed-down:active,#float-speed-up:active{
+  background:rgba(201,168,76,.3)!important;
 }
 
 /* 播放＋語音按鈕 — 縮小無外框 */
@@ -1588,7 +1587,7 @@ if(localStorage.getItem('nnjy_soft')==='1')document.body.setAttribute('data-soft
              letter-spacing:.15em;cursor:pointer">
       ⬇ 安裝至主畫面
     </button>
-    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.32</div>
+    <div style="font-size:10px;color:var(--text3);letter-spacing:.12em;margin-top:.5rem;opacity:.6">v1.0.9.33</div>
   </div>
 
   <!-- 公共經文庫頁 -->
@@ -1679,11 +1678,12 @@ if(localStorage.getItem('nnjy_soft')==='1')document.body.setAttribute('data-soft
         <button class="c-btn play" id="btn-play" aria-label="播放"
           style="width:32px;height:32px;font-size:16px;background:rgba(37,30,23,.5);border:1px solid rgba(201,168,76,.25);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">▶</button>
       </div>
-      <div id="float-speed-wrap" style="flex:1;min-width:0;display:flex;align-items:center;gap:6px">
-        <input type="range" id="float-speed-slider" min="100" max="500" step="10" value="300"
-          oninput="setSliderSpeed(this.value)"
-          style="flex:1;height:4px;accent-color:var(--accent);-webkit-appearance:none;cursor:pointer;background:rgba(200,168,112,.3);border-radius:2px;min-width:80px">
-        <span id="float-speed-label" style="font-size:11px;color:#c9a84c;font-family:var(--font-main);min-width:28px;text-align:center;white-space:nowrap">1x</span>
+      <div id="float-speed-wrap" style="flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px">
+        <button id="float-speed-down" onclick="adjustChantSpeed(1)" aria-label="減速"
+          style="width:28px;height:28px;flex-shrink:0;border-radius:50%;background:rgba(37,30,23,.5);border:1px solid rgba(201,168,76,.25);color:#c9a84c;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">−</button>
+        <span id="float-speed-label" style="font-size:12px;color:#c9a84c;font-family:var(--font-main);min-width:34px;text-align:center;white-space:nowrap">1x</span>
+        <button id="float-speed-up" onclick="adjustChantSpeed(-1)" aria-label="加速"
+          style="width:28px;height:28px;flex-shrink:0;border-radius:50%;background:rgba(37,30,23,.5);border:1px solid rgba(201,168,76,.25);color:#c9a84c;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)">＋</button>
       </div>
     </div>
     <div id="chant-ball" aria-label="念誦控制">誦</div>
@@ -1926,7 +1926,7 @@ if(localStorage.getItem('nnjy_soft')==='1')document.body.setAttribute('data-soft
   <div class="s-section" id="speed-section">
     <span class="s-label">念誦速度</span>
     <div style="font-size:12px;color:var(--text3);line-height:1.8">
-      速度依每個字計算，長句自動停留較久。<br>請點右下角「誦」浮球展開速度條調整。
+      速度依每個字計算，長句自動停留較久。<br>請點右下角「誦」浮球，用 −／＋ 鈕調整。
     </div>
   </div>
 
@@ -3599,20 +3599,27 @@ function calcDelay(){
 
 function setSliderSpeed(ms){
   ms=parseInt(ms)||300;
-  chantSpeed=ms;
+  chantSpeed=Math.max(100,Math.min(500,ms));
   // 計算倍速顯示：300ms = 1x，100ms = 2x，500ms = 0.5x（反比關係）
-  const rate=300/ms;
+  const rate=300/chantSpeed;
   const label=rate>=1.95?'2x':rate<=0.55?'0.5x':rate.toFixed(1)+'x';
   const el=document.getElementById('float-speed-label');
   if(el) el.textContent=label;
+  // 到底時淡化按鈕
+  const dn=document.getElementById('float-speed-down');
+  const up=document.getElementById('float-speed-up');
+  if(dn) dn.style.opacity=chantSpeed>=500?'.35':'1';
+  if(up) up.style.opacity=chantSpeed<=100?'.35':'1';
   updateAudioSpeed();
   if(isPlaying&&rafId)nextFireAt=performance.now()+calcDelay();
 }
+// 上下鈕調速：dir=+1 變慢、dir=-1 變快（每階 25ms）
+function adjustChantSpeed(dir){
+  setSliderSpeed(chantSpeed+dir*25);
+  localStorage.setItem('nnjy_speed',chantSpeed);
+}
 // 相容舊呼叫
 function setSegSpeed(ms){
-  chantSpeed=ms;
-  const slider=document.getElementById('float-speed-slider');
-  if(slider) slider.value=ms;
   setSliderSpeed(ms);
 }
 
@@ -4927,6 +4934,8 @@ applyTheme(localStorage.getItem('nnjy_theme') || '');
 })();
 // ── 還原護眼設定 ──
 setWarmFilter(parseInt(localStorage.getItem('nnjy_warm'))||0);
+// ── 還原念誦速度 ──
+setSliderSpeed(parseInt(localStorage.getItem('nnjy_speed'))||300);
 </script>
 </body>
 </html>
